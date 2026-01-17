@@ -3495,3 +3495,84 @@ All types tested successfully:
 
 **Agent started** (Open: 38, Done: 10)
 
+
+---
+
+## Iteration 12: IMPL-IMAGE-HANDLING
+
+**Date**: 2026-01-17
+**Story**: IMPL-IMAGE-HANDLING - Implement Image Handling Utilities
+**Status**: COMPLETED
+
+### Summary
+
+Implemented comprehensive image handling utilities for extracting voxels from images and masks, image normalization, and preprocessing operations. This forms the foundation for all feature extraction functions.
+
+### Functions Implemented
+
+#### Core Voxel Extraction
+- `get_voxels(image, mask; label)` - Extract voxel intensities from ROI
+- `get_voxels_with_coords(image, mask; label)` - Extract voxels with their CartesianIndex coordinates
+
+#### Volume and Count Utilities
+- `count_voxels(mask; label)` - Count number of voxels in ROI
+- `voxel_volume(image)` - Calculate single voxel volume in mm³
+- `roi_volume(image, mask)` - Calculate total ROI volume in mm³
+
+#### Image Normalization
+- `normalize_image(image, mask; scale, remove_outliers, outlier_percentile)` - Z-score normalization
+- `normalize_image!(image, mask; ...)` - In-place version
+- Formula: `f(x) = scale * (x - μ) / σ` where μ, σ computed from ROI
+
+#### 2D/3D Image Handling
+- `is_2d(image)` - Check if image is 2D (or has singleton dimension)
+- `is_3d(image)` - Check if image is truly 3D (all dimensions > 1)
+- `effective_ndims(image)` - Count non-singleton dimensions
+- `get_slice(image, dim, idx)` - Extract 2D slice from 3D image
+- `squeeze_image(image)` - Remove singleton dimensions
+
+#### Spacing and Physical Coordinates
+- `get_physical_size(image)` - Calculate physical dimensions in mm
+- `apply_spacing(coords, spacing)` - Convert voxel to physical coordinates
+- `get_centroid(mask; spacing)` - Calculate ROI centroid
+
+#### Validation and Conversion
+- `validate_image_mask(image, mask)` - Comprehensive image/mask validation
+- `ensure_float64(image)` - Convert image to Float64
+- Helper: `_get_bool_mask(mask, label)` - Internal mask conversion
+
+### Design Decisions
+
+1. **Multiple dispatch**: All functions support RadiomicsImage, RadiomicsMask, and plain arrays
+2. **Label support**: Integer masks support multi-label segmentation with label parameter
+3. **Error handling**: Informative errors with specific messages (DimensionMismatch, ArgumentError)
+4. **Warnings**: Small ROI warning (< 27 voxels) without throwing
+5. **In-place variants**: normalize_image! for performance when mutation is acceptable
+
+### Files Created/Modified
+
+- `src/image_handling.jl` - NEW: All image handling utilities (~550 lines)
+- `src/Radiomics.jl` - Updated: includes image_handling.jl, exports 14 functions
+- `ralph_loop/prd.json` - Updated: IMPL-IMAGE-HANDLING status to "done"
+
+### Verification
+
+All functions tested successfully:
+1. get_voxels with plain arrays - correct voxel count
+2. get_voxels with RadiomicsImage/RadiomicsMask - correct extraction
+3. get_voxels_with_coords - matching voxel/coord counts
+4. count_voxels, voxel_volume, roi_volume - correct calculations
+5. normalize_image - mean≈0, std≈1 after normalization
+6. is_2d, is_3d - correct dimension detection
+7. validate_image_mask - proper error handling
+8. get_slice - correct 2D slice extraction
+9. get_centroid - accurate centroid calculation
+10. effective_ndims - correct non-singleton count
+
+All 15 official tests pass via `Pkg.test()`.
+
+### References
+
+- PyRadiomics imageoperations.py: voxel extraction, normalization
+- PyRadiomics base.py: targetVoxelArray usage
+

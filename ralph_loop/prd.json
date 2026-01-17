@@ -290,7 +290,7 @@
       "title": "Implement Image Handling Utilities",
       "description": "Implement image loading, preprocessing, and voxel extraction",
       "priority": 11,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement get_voxels(image, mask) function",
         "Implement image normalization utilities",

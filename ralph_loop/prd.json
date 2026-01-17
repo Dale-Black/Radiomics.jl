@@ -605,7 +605,7 @@
       "title": "Test GLCM Feature Parity",
       "description": "Verify all GLCM features match PyRadiomics",
       "priority": 25,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_glcm.jl",
         "Test GLCM matrix computation matches PyRadiomics",

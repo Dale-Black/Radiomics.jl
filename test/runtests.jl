@@ -62,7 +62,9 @@ include("test_utils.jl")
 
     # Shape feature parity tests
     include("test_shape.jl")
-    # include("test_glcm.jl")
+
+    # GLCM feature parity tests
+    include("test_glcm.jl")
     # include("test_glrlm.jl")
     # include("test_glszm.jl")
     # include("test_ngtdm.jl")

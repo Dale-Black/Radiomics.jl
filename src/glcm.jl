@@ -411,9 +411,10 @@ function compute_glcm(image::AbstractArray{<:Real, 3},
     disc_result = discretize_image(image, mask; binwidth=binwidth, bincount=bincount)
 
     # Compute GLCM on discretized image
+    # Let Ng be auto-detected as max(gray levels) to match PyRadiomics behavior.
+    # PyRadiomics uses Ng = max(grayLevels), not nbins.
     return compute_glcm(disc_result.discretized, mask;
-                        distance=distance, symmetric=symmetric,
-                        Ng=disc_result.nbins)
+                        distance=distance, symmetric=symmetric)
 end
 
 function compute_glcm(image::AbstractArray{<:Real, 2},
@@ -425,9 +426,9 @@ function compute_glcm(image::AbstractArray{<:Real, 2},
 
     disc_result = discretize_image(image, mask; binwidth=binwidth, bincount=bincount)
 
+    # Let Ng be auto-detected as max(gray levels) to match PyRadiomics behavior.
     return compute_glcm_2d(disc_result.discretized, mask;
-                           distance=distance, symmetric=symmetric,
-                           Ng=disc_result.nbins)
+                           distance=distance, symmetric=symmetric)
 end
 
 #==============================================================================#
@@ -747,8 +748,8 @@ function _glcm_features_single(P::AbstractMatrix{Float64}, Ng::Int)
     end
 
     # 24. MCC: √(second largest eigenvalue of Q)
-    # Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pₓ(k))
-    mcc = _compute_mcc(P, px, Ng)
+    # Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pᵧ(j))
+    mcc = _compute_mcc(P, px, py, Ng)
 
     return (
         autocorrelation = autocorrelation,
@@ -779,33 +780,37 @@ function _glcm_features_single(P::AbstractMatrix{Float64}, Ng::Int)
 end
 
 """
-    _compute_mcc(P::AbstractMatrix{Float64}, px::Vector{Float64}, Ng::Int) -> Float64
+    _compute_mcc(P::AbstractMatrix{Float64}, px::Vector{Float64}, py::Vector{Float64}, Ng::Int) -> Float64
 
 Compute the Maximal Correlation Coefficient (MCC) from GLCM.
 
 MCC = √(second largest eigenvalue of Q)
-where Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pₓ(k))
+where Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pᵧ(j))
+
+Note: The formula uses pₓ(i) and pᵧ(j), not pₓ(i)·pₓ(k).
 
 # Edge Cases
 - Returns 1.0 for a 1×1 GLCM (single gray level)
 - Handles zero marginal probabilities
 """
-function _compute_mcc(P::AbstractMatrix{Float64}, px::Vector{Float64}, Ng::Int)
+function _compute_mcc(P::AbstractMatrix{Float64}, px::Vector{Float64}, py::Vector{Float64}, Ng::Int)
     # Edge case: single gray level
     if Ng == 1
         return 1.0
     end
 
-    # Build Q matrix: Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pₓ(k))
+    # Build Q matrix: Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pᵧ(j))
+    # Following PyRadiomics formula exactly
     Q = zeros(Float64, Ng, Ng)
 
     @inbounds for i in 1:Ng
         for k in 1:Ng
-            denom = px[i] * px[k]
-            if denom > GLCM_EPSILON
-                numerator = sum(P[i, j] * P[k, j] for j in 1:Ng)
-                Q[i, k] = numerator / denom
+            accum = 0.0
+            for j in 1:Ng
+                denom = px[i] * py[j] + GLCM_EPSILON
+                accum += P[i, j] * P[k, j] / denom
             end
+            Q[i, k] = accum
         end
     end
 

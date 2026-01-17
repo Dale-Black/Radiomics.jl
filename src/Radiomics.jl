@@ -46,9 +46,11 @@ include("mask_operations.jl")
 # Gray level discretization
 include("discretization.jl")
 
+# First-order statistical features
+include("firstorder.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("firstorder.jl")
 # include("shape.jl")
 # include("glcm.jl")
 # include("glrlm.jl")
@@ -107,5 +109,14 @@ export mask_surface_voxels, mask_interior_voxels
 export get_bin_edges, discretize, discretize_image, discretize_voxels
 export get_discretization_range, suggest_bincount, suggest_binwidth
 export count_gray_levels, gray_level_histogram
+
+# Export first-order feature functions
+export energy, total_energy, entropy
+export fo_minimum, fo_maximum, fo_mean, fo_median, fo_variance, fo_range
+export percentile_10, percentile_90
+export interquartile_range, mean_absolute_deviation, robust_mean_absolute_deviation
+export root_mean_squared, standard_deviation, skewness, kurtosis, uniformity
+export extract_firstorder, extract_firstorder_to_featureset!
+export firstorder_feature_names, firstorder_ibsi_features
 
 end # module Radiomics

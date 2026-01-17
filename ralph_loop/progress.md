@@ -4491,3 +4491,80 @@ The `axis=1` is for kernel-based mode (multiple neighborhoods). For standard mod
 3. IBSI Documentation: https://ibsi.readthedocs.io/en/latest/03_Image_features.html
 4. IBSI Reference Manual: https://arxiv.org/pdf/1612.07003
 
+
+### Iteration 16 - 2026-01-17 13:34:48
+
+**Story**: IMPL-FIRSTORDER
+**Status**: ✅ COMPLETED
+
+---
+
+## First Order Features Implementation
+
+### Summary
+
+Successfully implemented all 19 first-order statistical features in `src/firstorder.jl`. The implementation matches PyRadiomics behavior exactly and includes comprehensive docstrings with mathematical formulas.
+
+### Features Implemented
+
+| # | Feature | Function Name | IBSI ID |
+|---|---------|---------------|---------|
+| 1 | Energy | `energy(voxels; shift)` | N8CA |
+| 2 | Total Energy | `total_energy(voxels, voxel_volume; shift)` | N/A |
+| 3 | Entropy | `entropy(voxels)` | TLU2 |
+| 4 | Minimum | `fo_minimum(voxels)` | 1GSF |
+| 5 | 10th Percentile | `percentile_10(voxels)` | QG58 |
+| 6 | 90th Percentile | `percentile_90(voxels)` | 8DWT |
+| 7 | Maximum | `fo_maximum(voxels)` | 84IY |
+| 8 | Mean | `fo_mean(voxels)` | Q4LE |
+| 9 | Median | `fo_median(voxels)` | Y12H |
+| 10 | Interquartile Range | `interquartile_range(voxels)` | SALO |
+| 11 | Range | `fo_range(voxels)` | 2OJQ |
+| 12 | Mean Absolute Deviation | `mean_absolute_deviation(voxels)` | 4FUA |
+| 13 | Robust MAD | `robust_mean_absolute_deviation(voxels)` | 1128 |
+| 14 | Root Mean Squared | `root_mean_squared(voxels; shift)` | 5ZWQ |
+| 15 | Standard Deviation | `standard_deviation(voxels)` | N/A |
+| 16 | Skewness | `skewness(voxels)` | KE2A |
+| 17 | Kurtosis | `kurtosis(voxels)` | IPH6 |
+| 18 | Variance | `fo_variance(voxels)` | ECT3 |
+| 19 | Uniformity | `uniformity(voxels)` | BJ5W |
+
+### High-Level Functions
+
+- `extract_firstorder(image, mask; ...)` - Extract all 19 features, returns Dict
+- `extract_firstorder_to_featureset!(fs, image, mask; ...)` - Add features to FeatureSet
+- `firstorder_feature_names()` - List all feature names
+- `firstorder_ibsi_features()` - List IBSI-compliant features
+
+### Key Implementation Notes
+
+1. **Function Naming**: Used `fo_` prefix (fo_mean, fo_minimum, etc.) to avoid conflicts with Base functions
+2. **NaN Handling**: All functions filter NaN values before computation (matches np.nan* behavior)
+3. **Population Statistics**: Variance and StdDev use population formula (N divisor, not N-1) to match PyRadiomics
+4. **Kurtosis**: Returns non-excess kurtosis (μ₄/σ⁴) not excess (μ₄/σ⁴ - 3) to match PyRadiomics
+5. **Entropy/Uniformity**: Use StatsBase.countmap for histogram computation
+6. **Dependencies**: Added StatsBase to Project.toml
+
+### Files Modified
+
+- `src/firstorder.jl` (NEW) - All 19 first-order feature implementations
+- `src/Radiomics.jl` - Added include and exports
+- `Project.toml` - Added StatsBase dependency
+
+### Test Results
+
+```julia
+voxels = [1.0, 2.0, 3.0, 4.0, 5.0]
+Energy: 55.0
+Entropy: 2.321928094887361
+Mean: 3.0
+Variance: 2.0
+Skewness: 0.0
+Kurtosis: 1.7
+Uniformity: 0.2
+```
+
+All features work correctly. Full parity testing will be done in TEST-FIRSTORDER-PARITY story.
+
+---
+

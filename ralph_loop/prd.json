@@ -384,7 +384,7 @@
       "title": "Implement First Order Features",
       "description": "Implement all first-order statistical features",
       "priority": 16,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/firstorder.jl module",
         "Implement Energy feature",

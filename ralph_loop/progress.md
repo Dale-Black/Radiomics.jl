@@ -4672,3 +4672,344 @@ TEST-FIRSTORDER-PARITY: Add comprehensive first-order feature parity tests
 
 ---
 
+
+### Iteration 18 - 2026-01-17 13:52:18
+
+**Agent started** (Open: 31, Done: 17)
+
+
+### Iteration 18 - 2026-01-17
+
+**Story**: RESEARCH-SHAPE-DETAILS
+**Status**: ✅ COMPLETED
+
+---
+
+## Shape Features Research Findings
+
+### Summary
+
+Complete documentation of all PyRadiomics shape features (3D: 17 features, 2D: 10 features), including mesh generation approach, calculation methods, and Julia library options.
+
+### Sources
+
+- **PyRadiomics Documentation**: https://pyradiomics.readthedocs.io/en/latest/features.html
+- **PyRadiomics Source**: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/shape.py
+- **PyRadiomics 2D Source**: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/shape2D.py
+- **C Extension Source**: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/src/cshape.c
+- **IBSI Standard**: https://ibsi.readthedocs.io/en/latest/03_Image_features.html
+
+---
+
+## 3D Shape Features (17 features)
+
+### Feature Summary Table
+
+| # | Feature | Method | Formula | IBSI Code | Notes |
+|---|---------|--------|---------|-----------|-------|
+| 1 | Mesh Volume | `getMeshVolumeFeatureValue()` | V = Σ(Oa·(Ob×Oc))/6 | RNU0 | Mesh-based signed tetrahedra |
+| 2 | Voxel Volume | `getVoxelVolumeFeatureValue()` | V = Np × Vvoxel | - | Voxel count approximation |
+| 3 | Surface Area | `getSurfaceAreaFeatureValue()` | A = Σ½|ab×ac| | C0JK | Mesh triangle areas |
+| 4 | Surface-Volume Ratio | `getSurfaceVolumeRatioFeatureValue()` | A/V | 2PR5 | mm⁻¹ (not dimensionless) |
+| 5 | Sphericity | `getSphericityFeatureValue()` | ∛(36πV²)/A | QCFX | Range: (0,1], 1=sphere |
+| 6 | Compactness 1 | `getCompactness1FeatureValue()` | V/(π^½ × A^(3/2)) | SKGS | **Deprecated** |
+| 7 | Compactness 2 | `getCompactness2FeatureValue()` | 36π(V²/A³) | BQWJ | **Deprecated** (=Sphericity³) |
+| 8 | Spherical Disproportion | `getSphericalDisproportionFeatureValue()` | A/∛(36πV²) | KRCK | **Deprecated** (=1/Sphericity) |
+| 9 | Maximum 3D Diameter | `getMaximum3DDiameterFeatureValue()` | max(‖Xi-Xj‖) | L0JK | Feret diameter |
+| 10 | Maximum 2D Diameter (Slice) | `getMaximum2DDiameterSliceFeatureValue()` | max in row-column | - | Axial plane |
+| 11 | Maximum 2D Diameter (Column) | `getMaximum2DDiameterColumnFeatureValue()` | max in row-slice | - | Coronal plane |
+| 12 | Maximum 2D Diameter (Row) | `getMaximum2DDiameterRowFeatureValue()` | max in column-slice | - | Sagittal plane |
+| 13 | Major Axis Length | `getMajorAxisLengthFeatureValue()` | 4√λ_major | TDIC | PCA-based |
+| 14 | Minor Axis Length | `getMinorAxisLengthFeatureValue()` | 4√λ_minor | P9VJ | PCA-based |
+| 15 | Least Axis Length | `getLeastAxisLengthFeatureValue()` | 4√λ_least | 7J51 | PCA-based |
+| 16 | Elongation | `getElongationFeatureValue()` | √(λ_minor/λ_major) | Q3CK | Range: [0,1] |
+| 17 | Flatness | `getFlatnessFeatureValue()` | √(λ_least/λ_major) | N17B | Range: [0,1] |
+
+---
+
+## 2D Shape Features (10 features)
+
+| # | Feature | Method | Formula | Notes |
+|---|---------|--------|---------|-------|
+| 1 | Mesh Surface | `getMeshSurfaceFeatureValue()` | A = Σ½(Oa×Ob) | Signed area from mesh |
+| 2 | Pixel Surface | `getPixelSurfaceFeatureValue()` | A = Np × Apixel | Pixel count approx |
+| 3 | Perimeter | `getPerimeterFeatureValue()` | P = Σ√((ai-bi)²) | Line segment sum |
+| 4 | Perimeter-Surface Ratio | `getPerimeterSurfaceRatioFeatureValue()` | P/A | Not dimensionless |
+| 5 | Sphericity (2D) | `getSphericityFeatureValue()` | (2√(πA))/P | Range: (0,1], 1=circle |
+| 6 | Spherical Disproportion (2D) | `getSphericalDisproportionFeatureValue()` | P/(2√(πA)) | **Deprecated** |
+| 7 | Maximum 2D Diameter | `getMaximumDiameterFeatureValue()` | max(‖Xi-Xj‖) | Feret diameter |
+| 8 | Major Axis Length (2D) | `getMajorAxisLengthFeatureValue()` | 4√λ_major | PCA-based |
+| 9 | Minor Axis Length (2D) | `getMinorAxisLengthFeatureValue()` | 4√λ_minor | PCA-based |
+| 10 | Elongation (2D) | `getElongationFeatureValue()` | √(λ_minor/λ_major) | Range: [0,1] |
+
+---
+
+## Mesh Generation Approach
+
+### 3D: Marching Cubes Algorithm
+
+PyRadiomics uses the marching cubes algorithm (implemented in `radiomics/src/cshape.c`).
+
+**Algorithm Steps**:
+1. A 2×2×2 cube traverses the mask space
+2. Each corner is marked as '1' (inside ROI) or '0' (outside)
+3. 8-bit index encodes corner configuration (256 possible states)
+4. Lookup table maps index to triangle configuration
+5. Vertices placed at edge midpoints (0.5 offset)
+6. Up to 5 triangles per cube configuration
+
+**Key Data Structures**:
+```c
+gridAngles[8][3] = {
+  {0,0,0}, {0,0,1}, {0,1,1}, {0,1,0},
+  {1,0,0}, {1,0,1}, {1,1,1}, {1,1,0}
+}
+
+triTable[128][16]  // Lookup table for triangle configurations
+vertList[12][3]    // 12 edge midpoints with 0.5 offsets
+```
+
+**Symmetry Optimization**: Table only stores indices 0-127; indices 128-255 are handled by inverting (XOR 0xFF) with sign correction.
+
+### 2D: Marching Squares Algorithm
+
+Similar approach in 2D (implemented in same C file):
+- 2×2 square traverses mask
+- 4-bit index (16 configurations)
+- Lookup table maps to line segments
+
+**Data Structures**:
+```c
+gridAngles2D[4][2] = {{0,0}, {0,1}, {1,1}, {1,0}}
+lineTable2D[16][5]  // Line segment configurations
+vertList2D[4][2]    // Edge midpoints
+```
+
+---
+
+## Surface Area Calculation
+
+**3D Formula** (for each triangle with vertices a, b, c):
+```
+A_triangle = 0.5 × |ab × ac|
+```
+
+Where `ab × ac` is the cross product of edge vectors.
+
+**Implementation** (`cshape.c`):
+```c
+// Translate to c as origin
+a -= c; b -= c;
+// Cross product
+cross[0] = a[1]*b[2] - b[1]*a[2];
+cross[1] = a[2]*b[0] - b[2]*a[0];
+cross[2] = a[0]*b[1] - b[0]*a[1];
+// Area = 0.5 * |cross|
+area += 0.5 * sqrt(cross[0]^2 + cross[1]^2 + cross[2]^2);
+```
+
+**2D Perimeter**: Sum of line segment lengths (Euclidean distance between adjacent vertices).
+
+---
+
+## Volume Calculation
+
+**Formula** (signed tetrahedra method):
+```
+V = Σ (Oa · (Ob × Oc)) / 6
+```
+
+For each triangle with vertices a, b, c, compute the signed volume of the tetrahedron formed with origin O.
+
+**Implementation** (`cshape.c`):
+```c
+// First cross product (ab)
+ab[0] = a[1]*b[2] - b[1]*a[2];
+ab[1] = a[2]*b[0] - b[2]*a[0];
+ab[2] = a[0]*b[1] - b[0]*a[1];
+// Dot with c (scalar triple product)
+volume += sign_correction * (ab[0]*c[0] + ab[1]*c[1] + ab[2]*c[2]);
+// Final division
+volume /= 6;
+```
+
+**Sign Correction**: Required for inverted cube configurations (when cube_idx > 127).
+
+---
+
+## Maximum Diameter Calculation
+
+**3D Maximum Diameter**:
+- Store all mesh vertices from specific edges (6, 7, 11)
+- Compare all vertex pairs
+- Track maximum distance squared
+- Also track axis-aligned maxima (row, column, slice planes)
+- Return sqrt of maximum squared distance
+
+**2D Maximum Diameter**:
+- Compare all perimeter vertex pairs
+- Return maximum distance
+
+---
+
+## Eigenvalue-Based Features (PCA)
+
+**Algorithm** (for Major/Minor/Least Axis Length, Elongation, Flatness):
+
+1. Get physical coordinates of all ROI voxels:
+   ```
+   physical_coords = voxel_indices × pixel_spacing
+   ```
+
+2. Center at origin:
+   ```
+   centered = physical_coords - mean(physical_coords)
+   ```
+
+3. Normalize by √N:
+   ```
+   normalized = centered / sqrt(N_voxels)
+   ```
+
+4. Compute covariance matrix:
+   ```
+   cov = normalized' × normalized
+   ```
+
+5. Compute eigenvalues:
+   ```
+   λ = eigvals(cov)
+   ```
+
+6. Sort ascending: [λ_least, λ_minor, λ_major]
+
+**Axis Length Formula**: `4√λ` (diameter of enclosing ellipsoid)
+
+**Edge Cases**:
+- Negative eigenvalues (machine precision): clamp to 0
+- Values < -1e-10: log warning, return NaN
+
+---
+
+## Julia Implementation Strategy
+
+### Required Packages
+
+| Purpose | Package | Notes |
+|---------|---------|-------|
+| Marching Cubes | **Meshing.jl** | `isosurface(mask, MarchingCubes(iso=0.5))` |
+| Mesh Types | **GeometryBasics.jl** | Point, Face, Mesh types |
+| Linear Algebra | **LinearAlgebra** (stdlib) | eigvals, cross, dot |
+| Statistics | **Statistics** (stdlib) | mean |
+
+### Meshing.jl API
+
+```julia
+using Meshing
+
+# Convert boolean mask to Float64 (required)
+mask_float = Float64.(mask)
+
+# Generate mesh vertices and faces
+points, faces = isosurface(mask_float, MarchingCubes(iso=0.5))
+# points: Vector{NTuple{3, Float64}}
+# faces: Vector{NTuple{3, Int}}
+```
+
+**Note**: Meshing.jl uses iso=0 by default; for binary masks, use iso=0.5 to get the boundary.
+
+### Implementation Checklist
+
+**Core Functions Needed**:
+- [ ] `generate_mesh_3d(mask, spacing)` → mesh with physical coordinates
+- [ ] `generate_mesh_2d(mask, spacing)` → 2D perimeter mesh
+- [ ] `mesh_surface_area(points, faces)` → Float64 (mm²)
+- [ ] `mesh_volume(points, faces)` → Float64 (mm³)
+- [ ] `maximum_diameter(points)` → Float64 (mm)
+- [ ] `axis_aligned_diameters(points)` → (row, column, slice) diameters
+- [ ] `compute_eigenvalues(mask, spacing)` → (λ_least, λ_minor, λ_major)
+
+**3D Features**:
+- [ ] `mesh_volume(mask, spacing)` - Mesh Volume
+- [ ] `voxel_volume(mask, spacing)` - Voxel Volume
+- [ ] `surface_area(mask, spacing)` - Surface Area
+- [ ] `surface_volume_ratio(mask, spacing)` - A/V
+- [ ] `sphericity(mask, spacing)` - ∛(36πV²)/A
+- [ ] `compactness1(mask, spacing)` - Deprecated
+- [ ] `compactness2(mask, spacing)` - Deprecated
+- [ ] `spherical_disproportion(mask, spacing)` - Deprecated
+- [ ] `maximum_3d_diameter(mask, spacing)` - Feret
+- [ ] `maximum_2d_diameter_slice(mask, spacing)` - Axial max
+- [ ] `maximum_2d_diameter_column(mask, spacing)` - Coronal max
+- [ ] `maximum_2d_diameter_row(mask, spacing)` - Sagittal max
+- [ ] `major_axis_length(mask, spacing)` - 4√λ_major
+- [ ] `minor_axis_length(mask, spacing)` - 4√λ_minor
+- [ ] `least_axis_length(mask, spacing)` - 4√λ_least
+- [ ] `elongation(mask, spacing)` - √(λ_minor/λ_major)
+- [ ] `flatness(mask, spacing)` - √(λ_least/λ_major)
+
+**2D Features**:
+- [ ] `mesh_surface_2d(mask, spacing)` - 2D area
+- [ ] `pixel_surface(mask, spacing)` - Pixel count × area
+- [ ] `perimeter(mask, spacing)` - Line segment sum
+- [ ] `perimeter_surface_ratio(mask, spacing)` - P/A
+- [ ] `sphericity_2d(mask, spacing)` - Circularity
+- [ ] `spherical_disproportion_2d(mask, spacing)` - Deprecated
+- [ ] `maximum_diameter_2d(mask, spacing)` - 2D Feret
+- [ ] `major_axis_length_2d(mask, spacing)` - PCA
+- [ ] `minor_axis_length_2d(mask, spacing)` - PCA
+- [ ] `elongation_2d(mask, spacing)` - PCA ratio
+
+---
+
+## Critical Implementation Notes
+
+### 1. Pixel Spacing Convention
+PyRadiomics uses **reversed spacing**: `(z, y, x)` from SimpleITK, but internally processes as `(x, y, z)`. Must match exactly.
+
+### 2. Mask Padding
+PyRadiomics pads the mask with 1 voxel border of zeros to prevent index errors in marching cubes. Our implementation must do the same.
+
+### 3. Mesh Vertex Positions
+Vertices are at edge midpoints (0.5 offset), then scaled by pixel spacing. The formula is:
+```
+physical_pos = (voxel_idx + vertex_offset) × spacing
+```
+
+### 4. Coordinate Transformation for PCA
+Physical coordinates must account for voxel spacing:
+```julia
+physical_coords = voxel_indices .* spacing'
+```
+
+### 5. Eigenvalue Precision
+Check for small negative eigenvalues (machine precision error):
+- If eigenvalue > -1e-10: clamp to 0
+- If eigenvalue < -1e-10: return NaN
+
+### 6. 2D vs 3D Mode
+- 3D: Full marching cubes, 3 eigenvalues
+- 2D: Marching squares, 2 eigenvalues, `force2D=True` in PyRadiomics
+
+---
+
+## Dependencies Summary
+
+### Pure Julia (Main Package)
+```toml
+[deps]
+Meshing = "..."
+GeometryBasics = "..."
+LinearAlgebra = "..."  # stdlib
+Statistics = "..."      # stdlib
+```
+
+### Test Dependencies (PythonCall)
+```toml
+[extras]
+PythonCall = "..."
+CondaPkg = "..."
+```
+
+---
+

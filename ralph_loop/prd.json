@@ -437,7 +437,7 @@
       "title": "Research Shape Features in Detail",
       "description": "Document exact implementation of all shape features",
       "priority": 18,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "List all 2D shape features in PyRadiomics",
         "List all 3D shape features in PyRadiomics",

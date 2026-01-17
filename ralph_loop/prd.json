@@ -624,7 +624,7 @@
       "title": "Research GLRLM Features in Detail",
       "description": "Document GLRLM matrix computation and features",
       "priority": 26,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Document GLRLM matrix definition",
         "Document run length computation algorithm",

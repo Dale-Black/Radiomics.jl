@@ -5811,3 +5811,381 @@ The next story is **TEST-GLCM-PARITY** (priority 25) which will verify all GLCM 
 
 ---
 
+
+### Iteration 27 - 2026-01-17 15:38:00
+
+**Agent started** (Open: 23, Done: 25)
+
+
+### Iteration 27 - 2026-01-17
+
+**Story**: RESEARCH-GLRLM-DETAILS
+**Status**: ✅ COMPLETED
+
+---
+
+## GLRLM Research Findings
+
+This section documents comprehensive research on Gray Level Run Length Matrix (GLRLM) features for the Radiomics.jl implementation.
+
+### 1. GLRLM Matrix Definition
+
+**Source**: [PyRadiomics GLRLM Documentation](https://pyradiomics.readthedocs.io/en/latest/features.html), [IBSI Documentation](https://ibsi.readthedocs.io/en/latest/03_Image_features.html)
+
+#### 1.1 What is GLRLM?
+
+A Gray Level Run Length Matrix (GLRLM) quantifies **consecutive pixels (runs) with the same gray level value** along specific directions. Unlike GLCM which measures co-occurrence of neighboring pixels, GLRLM measures the length of homogeneous sequences.
+
+#### 1.2 Matrix Structure
+
+- **P(i,j|θ)**: The (i,j)th element describes the number of runs with gray level `i` and length `j` occurring in the image (ROI) along angle θ
+- **Dimensions**: Ng × Nr × Na where:
+  - Ng = Number of discrete gray levels
+  - Nr = Maximum possible run length (typically max dimension of image)
+  - Na = Number of angles (13 in 3D, 4 in 2D)
+
+#### 1.3 Key Variables
+
+| Variable | Definition |
+|----------|------------|
+| **Ng** | Number of discrete intensity values in ROI |
+| **Nr** | Maximum possible run length |
+| **Np** | Total number of voxels in ROI |
+| **Ns = Nr(θ)** | Total number of runs along angle θ = Σᵢ Σⱼ P(i,j\|θ) |
+| **p(i,j\|θ)** | Normalized matrix = P(i,j\|θ) / Nr(θ) |
+| **pg** | Gray level marginal = Σⱼ P(i,j\|θ) (summed over run lengths) |
+| **pr** | Run length marginal = Σᵢ P(i,j\|θ) (summed over gray levels) |
+
+### 2. Run Length Computation Algorithm
+
+**Source**: [PyRadiomics cmatrices.c](https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/src/cmatrices.c)
+
+#### 2.1 Algorithm Overview
+
+The run length computation works as follows:
+
+1. **For each direction θ**:
+   - Identify all valid starting positions (voxels at the "beginning" of the scan line)
+   - Starting positions are where the index equals the start boundary for at least one "moving dimension"
+
+2. **For each starting position**:
+   - Initialize: current gray level `gl`, run length `rl = 0`
+   - Traverse along the direction until exiting the image/ROI
+   
+3. **During traversal**:
+   - If next voxel has same gray level AND is in mask: increment `rl`
+   - If different gray level OR voxel not in mask OR boundary reached:
+     - Record the run: `P(gl, rl, θ) += 1`
+     - Start new run with next voxel's gray level
+
+4. **At boundary**:
+   - Record final run before exiting
+
+#### 2.2 Pseudocode
+
+```
+for each angle θ in angles:
+    for each starting position (x, y, z):
+        gl = gray_level[x, y, z]
+        rl = 0
+        while position in bounds AND in mask:
+            if gray_level[position] == gl:
+                rl += 1
+            else:
+                if rl > 0:
+                    P[gl, rl, θ] += 1
+                gl = gray_level[position]
+                rl = 1
+            advance position along θ
+        # Record final run
+        if rl > 0:
+            P[gl, rl, θ] += 1
+```
+
+#### 2.3 Handling Masked Voxels
+
+- Only voxels where `mask[i] == true` are considered
+- A run **terminates** when encountering an unmasked voxel
+- The unmasked voxel is NOT counted as part of any run
+- A new run can start after the masked region (if traversal continues)
+
+### 3. Direction Handling (13 Directions in 3D)
+
+**Source**: [PyRadiomics Documentation](https://pyradiomics.readthedocs.io/en/latest/features.html)
+
+#### 3.1 Standard 13 Directions in 3D
+
+For 3D images, GLRLM is computed along 13 unique directions (each direction and its opposite yield the same runs, so we only use one):
+
+| # | Direction (dx, dy, dz) | Description |
+|---|------------------------|-------------|
+| 1 | (1, 0, 0) | Right |
+| 2 | (0, 1, 0) | Down |
+| 3 | (0, 0, 1) | Forward (depth) |
+| 4 | (1, 1, 0) | Diagonal in XY plane |
+| 5 | (1, -1, 0) | Anti-diagonal in XY plane |
+| 6 | (1, 0, 1) | Diagonal in XZ plane |
+| 7 | (1, 0, -1) | Anti-diagonal in XZ plane |
+| 8 | (0, 1, 1) | Diagonal in YZ plane |
+| 9 | (0, 1, -1) | Anti-diagonal in YZ plane |
+| 10 | (1, 1, 1) | 3D diagonal |
+| 11 | (1, 1, -1) | 3D anti-diagonal |
+| 12 | (1, -1, 1) | 3D anti-diagonal |
+| 13 | (1, -1, -1) | 3D anti-diagonal |
+
+#### 3.2 Standard 4 Directions in 2D
+
+| # | Direction (dx, dy) | Angle |
+|---|-------------------|-------|
+| 1 | (1, 0) | 0° (horizontal) |
+| 2 | (0, 1) | 90° (vertical) |
+| 3 | (1, 1) | 45° (diagonal) |
+| 4 | (1, -1) | 135° (anti-diagonal) |
+
+#### 3.3 PyRadiomics Angle Generation
+
+PyRadiomics dynamically generates angles based on:
+- `distance` parameter (default = 1)
+- Image dimensionality (2D vs 3D)
+- The formula: Na_d = (2d + 1)^Nd - (2d - 1)^Nd where d = distance, Nd = dimensions
+
+For 3D with distance=1: (3)³ - (1)³ = 27 - 1 = 26 total neighbor offsets, which reduces to 13 unique directions.
+
+### 4. All 16 GLRLM Features with Formulas
+
+**Source**: [PyRadiomics glrlm.py](https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/glrlm.py), [IBSI Documentation](https://ibsi.readthedocs.io/en/latest/03_Image_features.html)
+
+#### Feature Summary Table
+
+| # | Feature Name | PyRadiomics Function | IBSI Code | Formula |
+|---|--------------|---------------------|-----------|---------|
+| 1 | Short Run Emphasis | `getShortRunEmphasisFeatureValue` | 22OV | SRE = Σᵢ Σⱼ P(i,j)/(j²) / Ns |
+| 2 | Long Run Emphasis | `getLongRunEmphasisFeatureValue` | W4KF | LRE = Σᵢ Σⱼ P(i,j)·j² / Ns |
+| 3 | Gray Level Non-Uniformity | `getGrayLevelNonUniformityFeatureValue` | R5YN | GLN = Σᵢ (Σⱼ P(i,j))² / Ns |
+| 4 | Gray Level Non-Uniformity Normalized | `getGrayLevelNonUniformityNormalizedFeatureValue` | OVBL | GLNN = Σᵢ (Σⱼ P(i,j))² / Ns² |
+| 5 | Run Length Non-Uniformity | `getRunLengthNonUniformityFeatureValue` | W92Y | RLN = Σⱼ (Σᵢ P(i,j))² / Ns |
+| 6 | Run Length Non-Uniformity Normalized | `getRunLengthNonUniformityNormalizedFeatureValue` | IC23 | RLNN = Σⱼ (Σᵢ P(i,j))² / Ns² |
+| 7 | Run Percentage | `getRunPercentageFeatureValue` | 9ZK5 | RP = Ns / Np |
+| 8 | Gray Level Variance | `getGrayLevelVarianceFeatureValue` | 8CE5 | GLV = Σᵢ Σⱼ p(i,j)·(i - μᵢ)² |
+| 9 | Run Variance | `getRunVarianceFeatureValue` | SBER | RV = Σᵢ Σⱼ p(i,j)·(j - μⱼ)² |
+| 10 | Run Entropy | `getRunEntropyFeatureValue` | HJ9O | RE = -Σᵢ Σⱼ p(i,j)·log₂(p(i,j)+ε) |
+| 11 | Low Gray Level Run Emphasis | `getLowGrayLevelRunEmphasisFeatureValue` | V3SW | LGLRE = Σᵢ Σⱼ P(i,j)/(i²) / Ns |
+| 12 | High Gray Level Run Emphasis | `getHighGrayLevelRunEmphasisFeatureValue` | G6QU | HGLRE = Σᵢ Σⱼ P(i,j)·i² / Ns |
+| 13 | Short Run Low Gray Level Emphasis | `getShortRunLowGrayLevelEmphasisFeatureValue` | HTZT | SRLGLE = Σᵢ Σⱼ P(i,j)/(i²·j²) / Ns |
+| 14 | Short Run High Gray Level Emphasis | `getShortRunHighGrayLevelEmphasisFeatureValue` | GD3A | SRHGLE = Σᵢ Σⱼ P(i,j)·i²/(j²) / Ns |
+| 15 | Long Run Low Gray Level Emphasis | `getLongRunLowGrayLevelEmphasisFeatureValue` | IVPO | LRLGLE = Σᵢ Σⱼ P(i,j)·j²/(i²) / Ns |
+| 16 | Long Run High Gray Level Emphasis | `getLongRunHighGrayLevelEmphasisFeatureValue` | 3KUM | LRHGLE = Σᵢ Σⱼ P(i,j)·i²·j² / Ns |
+
+#### 4.1 Detailed Feature Formulas
+
+**Where:**
+- P(i,j) = GLRLM matrix element (count of runs with gray level i and length j)
+- p(i,j) = P(i,j) / Ns (normalized probability)
+- Ns = Σᵢ Σⱼ P(i,j) = total number of runs
+- Np = total number of voxels in ROI
+- μᵢ = Σᵢ Σⱼ p(i,j)·i (mean gray level of runs)
+- μⱼ = Σᵢ Σⱼ p(i,j)·j (mean run length)
+- ε ≈ 2.2×10⁻¹⁶ (machine epsilon to prevent log(0))
+
+##### Run Emphasis Features
+
+```
+Short Run Emphasis (SRE):
+    SRE = (1/Ns) × Σᵢ Σⱼ P(i,j) / j²
+    Interpretation: Higher values → finer textures with short runs
+
+Long Run Emphasis (LRE):
+    LRE = (1/Ns) × Σᵢ Σⱼ P(i,j) × j²
+    Interpretation: Higher values → coarser textures with long runs
+```
+
+##### Gray Level Emphasis Features
+
+```
+Low Gray Level Run Emphasis (LGLRE):
+    LGLRE = (1/Ns) × Σᵢ Σⱼ P(i,j) / i²
+    Interpretation: Higher values → more dark runs
+
+High Gray Level Run Emphasis (HGLRE):
+    HGLRE = (1/Ns) × Σᵢ Σⱼ P(i,j) × i²
+    Interpretation: Higher values → more bright runs
+```
+
+##### Combined Emphasis Features
+
+```
+Short Run Low Gray Level Emphasis (SRLGLE):
+    SRLGLE = (1/Ns) × Σᵢ Σⱼ P(i,j) / (i² × j²)
+
+Short Run High Gray Level Emphasis (SRHGLE):
+    SRHGLE = (1/Ns) × Σᵢ Σⱼ P(i,j) × i² / j²
+
+Long Run Low Gray Level Emphasis (LRLGLE):
+    LRLGLE = (1/Ns) × Σᵢ Σⱼ P(i,j) × j² / i²
+
+Long Run High Gray Level Emphasis (LRHGLE):
+    LRHGLE = (1/Ns) × Σᵢ Σⱼ P(i,j) × i² × j²
+```
+
+##### Non-Uniformity Features
+
+```
+Gray Level Non-Uniformity (GLN):
+    pg(i) = Σⱼ P(i,j)  (gray level marginal)
+    GLN = (1/Ns) × Σᵢ pg(i)²
+    Interpretation: Lower values → more uniform gray levels
+
+Gray Level Non-Uniformity Normalized (GLNN):
+    GLNN = Σᵢ pg(i)² / Ns²
+    Range: [0, 1], where 1 = single gray level
+
+Run Length Non-Uniformity (RLN):
+    pr(j) = Σᵢ P(i,j)  (run length marginal)
+    RLN = (1/Ns) × Σⱼ pr(j)²
+    Interpretation: Lower values → more uniform run lengths
+
+Run Length Non-Uniformity Normalized (RLNN):
+    RLNN = Σⱼ pr(j)² / Ns²
+    Range: [0, 1], where 1 = single run length
+```
+
+##### Statistical Features
+
+```
+Run Percentage (RP):
+    RP = Ns / Np
+    Range: [1/Np, 1]
+    Interpretation: Higher values → finer textures (more runs relative to voxels)
+    Note: Np can be computed as Σᵢ Σⱼ P(i,j) × j
+
+Gray Level Variance (GLV):
+    μᵢ = Σᵢ Σⱼ p(i,j) × i
+    GLV = Σᵢ Σⱼ p(i,j) × (i - μᵢ)²
+    Interpretation: Measures variance in gray level intensities
+
+Run Variance (RV):
+    μⱼ = Σᵢ Σⱼ p(i,j) × j
+    RV = Σᵢ Σⱼ p(i,j) × (j - μⱼ)²
+    Interpretation: Measures variance in run lengths
+
+Run Entropy (RE):
+    RE = -Σᵢ Σⱼ p(i,j) × log₂(p(i,j) + ε)
+    Interpretation: Measures randomness/uncertainty in run distribution
+```
+
+### 5. Aggregation Methods
+
+**Source**: [PyRadiomics Documentation](https://pyradiomics.readthedocs.io/en/latest/features.html)
+
+#### 5.1 Default: Mean Aggregation
+
+By default, PyRadiomics:
+1. Computes GLRLM for each of the 13 directions separately
+2. Calculates features for each direction
+3. Returns the **mean** of feature values across all directions
+
+```python
+# In PyRadiomics glrlm.py
+return numpy.nanmean(feature_value_per_angle)
+```
+
+#### 5.2 Alternative: Weighted Aggregation (Distance Weighting)
+
+When `weightingNorm` is specified:
+1. GLRLMs are weighted by the distance between neighboring voxels
+2. Weighted matrices are summed
+3. The combined matrix is normalized
+4. Features are extracted from the single combined matrix
+
+**Weighting Norms**:
+- `manhattan`: L1 norm
+- `euclidean`: L2 norm
+- `infinity`: L∞ norm
+
+#### 5.3 Implementation Notes
+
+For our Julia implementation:
+- **Default**: Mean aggregation across 13 directions
+- Compute features for each direction, then average using `nanmean`
+- Handle NaN values (when Ns = 0 for a direction) by excluding from mean
+
+### 6. Implementation Checklist for IMPL-GLRLM-MATRIX
+
+| Task | Description | Priority |
+|------|-------------|----------|
+| Define 13 directions | Create direction offset array for 3D | High |
+| Define 4 directions for 2D | Create direction offset array for 2D | High |
+| Implement run detection | Scan along each direction, count runs | High |
+| Handle mask boundaries | Terminate runs at mask edges | High |
+| Build GLRLM matrix | Accumulate run counts into Ng×Nr matrix | High |
+| Compute marginals | pg (gray level) and pr (run length) sums | Medium |
+| Remove empty levels | Prune zero rows/columns from matrix | Medium |
+| Support distance parameter | Allow configurable step size | Low |
+
+### 7. Implementation Checklist for IMPL-GLRLM-FEATURES
+
+| Feature | Function Name | Formula Reference | Priority |
+|---------|---------------|-------------------|----------|
+| Short Run Emphasis | `glrlm_short_run_emphasis` | SRE = Σ P(i,j)/j² / Ns | High |
+| Long Run Emphasis | `glrlm_long_run_emphasis` | LRE = Σ P(i,j)×j² / Ns | High |
+| Gray Level Non-Uniformity | `glrlm_gray_level_non_uniformity` | GLN = Σ pg² / Ns | High |
+| Gray Level Non-Uniformity Normalized | `glrlm_gray_level_non_uniformity_normalized` | GLNN = Σ pg² / Ns² | High |
+| Run Length Non-Uniformity | `glrlm_run_length_non_uniformity` | RLN = Σ pr² / Ns | High |
+| Run Length Non-Uniformity Normalized | `glrlm_run_length_non_uniformity_normalized` | RLNN = Σ pr² / Ns² | High |
+| Run Percentage | `glrlm_run_percentage` | RP = Ns / Np | High |
+| Gray Level Variance | `glrlm_gray_level_variance` | GLV = Σ p(i,j)(i-μ)² | High |
+| Run Variance | `glrlm_run_variance` | RV = Σ p(i,j)(j-μ)² | High |
+| Run Entropy | `glrlm_run_entropy` | RE = -Σ p(i,j)log₂(p(i,j)) | High |
+| Low Gray Level Run Emphasis | `glrlm_low_gray_level_run_emphasis` | LGLRE = Σ P(i,j)/i² / Ns | High |
+| High Gray Level Run Emphasis | `glrlm_high_gray_level_run_emphasis` | HGLRE = Σ P(i,j)×i² / Ns | High |
+| Short Run Low Gray Level Emphasis | `glrlm_short_run_low_gray_level_emphasis` | SRLGLE = Σ P(i,j)/(i²j²) / Ns | High |
+| Short Run High Gray Level Emphasis | `glrlm_short_run_high_gray_level_emphasis` | SRHGLE = Σ P(i,j)×i²/j² / Ns | High |
+| Long Run Low Gray Level Emphasis | `glrlm_long_run_low_gray_level_emphasis` | LRLGLE = Σ P(i,j)×j²/i² / Ns | High |
+| Long Run High Gray Level Emphasis | `glrlm_long_run_high_gray_level_emphasis` | LRHGLE = Σ P(i,j)×i²×j² / Ns | High |
+
+### 8. Edge Cases and Special Handling
+
+| Case | Handling |
+|------|----------|
+| Empty ROI (no voxels in mask) | Return NaN for all features |
+| Single gray level | GLN = Ns, GLNN = 1.0 |
+| Single run length | RLN = Ns, RLNN = 1.0 |
+| Ns = 0 (no runs) | Set Nr to NaN to cause division errors → nanmean ignores |
+| log(0) in entropy | Add ε ≈ 2.2×10⁻¹⁶ before taking log |
+| Division by i² when i=0 | Gray levels are 1-indexed (minimum is 1, not 0) |
+
+### 9. PyRadiomics Implementation Notes
+
+**File**: `radiomics/glrlm.py`
+
+#### 9.1 Key Implementation Details
+
+1. **ivector**: Array of actual gray levels present in ROI (1-indexed)
+2. **jvector**: Array from 1 to Nr (run lengths)
+3. **pg**: Gray level marginal, shape (Nvox, Ng, Na)
+4. **pr**: Run length marginal, shape (Nvox, Nr, Na)
+5. **Empty level removal**: Rows/columns with all zeros are removed from matrix
+
+#### 9.2 Coefficient Calculation
+
+```python
+# In _calculateCoefficients():
+self.coefficients['pg'] = numpy.sum(P_glrlm, 2, keepdims=True)  # Sum over j
+self.coefficients['pr'] = numpy.sum(P_glrlm, 1, keepdims=True)  # Sum over i
+
+# Remove empty run lengths
+pr_sum = numpy.sum(self.coefficients['pr'], (0, 2))
+emptyRunLengths = numpy.where(pr_sum == 0)[0]
+# ... prune jvector and P_glrlm accordingly
+```
+
+### 10. References
+
+- **PyRadiomics GLRLM**: https://pyradiomics.readthedocs.io/en/latest/features.html#module-radiomics.glrlm
+- **PyRadiomics Source**: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/glrlm.py
+- **IBSI Documentation**: https://ibsi.readthedocs.io/en/latest/03_Image_features.html
+- **LIFEx GLRLM**: https://lifexsoft.org/index.php/resources/texture/radiomic-features/grey-level-run-length-matrix-glrlm
+- **Original Paper**: Galloway, M. M. (1975). Texture analysis using gray level run lengths.
+
+---
+

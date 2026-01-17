@@ -34,8 +34,10 @@ using LinearAlgebra
 # Package version
 const VERSION = v"0.1.0"
 
+# Core types
+include("types.jl")
+
 # Module files will be included here as they are implemented
-# include("types.jl")
 # include("utils.jl")
 # include("discretization.jl")
 # include("firstorder.jl")
@@ -47,6 +49,31 @@ const VERSION = v"0.1.0"
 # include("gldm.jl")
 # include("extractor.jl")
 
-# Exports will be added as features are implemented
+# Export abstract types
+export AbstractRadiomicsFeature,
+       AbstractFirstOrderFeature,
+       AbstractShapeFeature,
+       AbstractTextureFeature,
+       AbstractGLCMFeature,
+       AbstractGLRLMFeature,
+       AbstractGLSZMFeature,
+       AbstractNGTDMFeature,
+       AbstractGLDMFeature
+
+# Export discretization mode
+export DiscretizationMode, FixedBinWidth, FixedBinCount
+
+# Export settings
+export Settings, validate_settings
+
+# Export image and mask types
+export RadiomicsImage, RadiomicsMask
+export get_roi_mask, get_data, get_spacing, get_mask_data
+
+# Export feature result types
+export FeatureResult, FeatureSet, feature_key
+
+# Export type aliases
+export ImageLike, MaskLike
 
 end # module Radiomics

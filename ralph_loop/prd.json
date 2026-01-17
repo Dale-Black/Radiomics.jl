@@ -270,7 +270,7 @@
       "title": "Implement Core Types and Structs",
       "description": "Define core Julia types for images, masks, and feature results",
       "priority": 10,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Define RadiomicsImage type or appropriate abstraction",
         "Define RadiomicsMask type for ROI handling",

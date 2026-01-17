@@ -3377,3 +3377,116 @@ Implemented a comprehensive test harness for PyRadiomics parity testing using Py
 - CondaPkg.jl: https://github.com/JuliaPy/CondaPkg.jl
 - PyRadiomics: https://github.com/AIM-Harvard/pyradiomics
 
+
+### Iteration 10 - 2026-01-17 12:57:17
+
+**Agent started** (Open: 39, Done: 9)
+
+
+---
+
+## Iteration 11: IMPL-CORE-TYPES
+
+**Date**: 2026-01-17
+**Story**: IMPL-CORE-TYPES - Implement Core Types and Structs
+**Status**: COMPLETED
+
+### Summary
+
+Implemented all core types for Radiomics.jl, establishing the foundation for the feature extraction system.
+
+### Types Implemented
+
+#### 1. Abstract Type Hierarchy
+
+```
+AbstractRadiomicsFeature
+├── AbstractFirstOrderFeature
+├── AbstractShapeFeature
+└── AbstractTextureFeature
+    ├── AbstractGLCMFeature
+    ├── AbstractGLRLMFeature
+    ├── AbstractGLSZMFeature
+    ├── AbstractNGTDMFeature
+    └── AbstractGLDMFeature
+```
+
+#### 2. Settings Struct
+
+`Settings` with @kwdef for keyword construction:
+- **Discretization**: `binwidth`, `bincount`, `discretization_mode`
+- **Mask/Label**: `label` (default: 1)
+- **Preprocessing**: `resample_spacing`, `normalize`, `normalize_scale`, `remove_outliers`, `outlier_percentile`
+- **2D/3D handling**: `force_2d`, `force_2d_dimension`
+- **Texture parameters**: `glcm_distance`, `symmetrical_glcm`, `gldm_alpha`, `ngtdm_distance`
+- **Performance**: `preallocate`
+- **PyRadiomics compatibility**: `voxel_array_shift`
+
+`DiscretizationMode` enum: `FixedBinWidth`, `FixedBinCount`
+
+#### 3. RadiomicsImage{T, N}
+
+Wrapper for medical images with:
+- `data::Array{T, N}`: Image intensity data
+- `spacing::NTuple{N, Float64}`: Voxel spacing in mm
+- Validation: only 2D/3D, positive spacing
+- AbstractArray interface (size, getindex, etc.)
+- Default unit spacing constructor
+
+#### 4. RadiomicsMask{N}
+
+Wrapper for segmentation masks with:
+- `data::Array{Int, N}`: Mask labels
+- `label::Int`: ROI label value (default: 1)
+- Constructors from Int, Bool, and BitArray
+- AbstractArray interface
+- `get_roi_mask()` function for boolean extraction
+
+#### 5. FeatureResult
+
+Single feature result container:
+- `name::String`: Feature name
+- `value::Float64`: Computed value
+- `feature_class::String`: Feature class
+- `image_type::String`: Image filter type
+
+#### 6. FeatureSet
+
+Collection of FeatureResult with:
+- Vector-based storage
+- Settings reference
+- Dict-like access by key (e.g., "firstorder_Energy")
+- Conversion to Dict
+- Pretty printing (shows first 10 features)
+
+#### 7. Type Aliases
+
+- `ImageLike{T, N}`: Union of Array and RadiomicsImage
+- `MaskLike{N}`: Union of Bool/Int arrays and RadiomicsMask
+
+### Utility Functions
+
+- `validate_settings(s::Settings)`: Validates all settings parameters
+- `get_data(img)`: Extract raw array from RadiomicsImage or pass through
+- `get_spacing(img)`: Get spacing (default unit spacing for plain arrays)
+- `get_roi_mask(mask)`: Get boolean ROI from any mask type
+- `get_mask_data(mask)`: Extract raw array from RadiomicsMask
+- `feature_key(r::FeatureResult)`: Generate dictionary key
+
+### Files Created/Modified
+
+- `src/types.jl` - NEW: All core types (~400 lines)
+- `src/Radiomics.jl` - Updated: includes types.jl, exports all types
+- `ralph_loop/prd.json` - Updated: IMPL-CORE-TYPES status to "done"
+
+### Verification
+
+All types tested successfully:
+- Settings creation with defaults and custom values
+- Settings validation catches invalid parameters
+- RadiomicsImage creation with/without spacing
+- RadiomicsMask from Int, Bool, and BitArray
+- get_roi_mask extracts correct boolean mask
+- FeatureResult creation and formatting
+- FeatureSet with Dict-like access
+

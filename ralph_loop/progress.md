@@ -5538,3 +5538,98 @@ end
 
 **Agent started** (Open: 26, Done: 22)
 
+
+### Iteration 24 - 2026-01-17
+
+**Story**: IMPL-GLCM-MATRIX
+**Status**: ✅ COMPLETED
+
+---
+
+## GLCM Matrix Implementation Summary
+
+Successfully implemented Gray Level Co-occurrence Matrix (GLCM) computation in `src/glcm.jl`.
+
+### Files Created/Modified
+
+1. **src/glcm.jl** (new) - Complete GLCM matrix computation module
+2. **src/Radiomics.jl** (modified) - Added GLCM module include and exports
+
+### Implementation Details
+
+#### Constants Defined
+- `GLCM_DIRECTIONS_3D`: 13 unique direction offsets for 3D texture analysis
+- `GLCM_DIRECTIONS_2D`: 4 unique direction offsets for 2D texture analysis
+- `GLCM_EPSILON`: Machine epsilon for numerical stability
+
+#### Types Created
+- `GLCMResult`: Container for 3D GLCM computation results
+  - `matrices`: Normalized GLCM matrices (Ng × Ng × 13)
+  - `Ng`: Number of gray levels
+  - `num_directions`: Number of directions (13 for 3D)
+  - `distance`: Distance parameter used
+  - `symmetric`: Whether matrices are symmetric
+  - `directions`: Direction offsets used
+  - `counts`: Raw pair counts per direction
+
+- `GLCMResult2D`: Container for 2D GLCM computation results
+  - Similar structure with 4 directions instead of 13
+
+#### Core Functions Implemented
+1. **`compute_glcm(image, mask; distance, symmetric, Ng)`** - Main 3D GLCM computation
+   - Handles discretized integer input
+   - Supports all 13 directions
+   - Configurable distance parameter (default: 1)
+   - Optional symmetry (default: true, matching PyRadiomics)
+   - Proper normalization (each direction sums to 1)
+
+2. **`compute_glcm_2d(image, mask; ...)`** - 2D GLCM computation
+   - 4 directions: 0°, 45°, 90°, 135°
+
+3. **`compute_glcm(image::Real, mask; binwidth, bincount, ...)`** - Convenience wrapper
+   - Auto-discretizes float images before GLCM computation
+   - Supports both Fixed Bin Width and Fixed Bin Count modes
+
+4. **`compute_glcm(image, mask, settings::Settings)`** - Settings-based computation
+
+#### Auxiliary Functions
+- `_glcm_marginals(P)`: Compute marginal distributions (px, py, μx, μy, σx, σy)
+- `_glcm_sum_diff_distributions(P)`: Compute p_{x+y} and p_{x-y} distributions
+- `get_averaged_glcm(result)`: Average GLCM across directions
+- `get_merged_glcm(result)`: Merge (sum and normalize) GLCM across directions
+- `glcm_num_gray_levels(result)`: Get Ng
+- `glcm_num_directions(result)`: Get number of directions
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create src/glcm.jl module | ✅ |
+| Implement GLCM matrix computation | ✅ |
+| Support all 13 directions in 3D | ✅ |
+| Support configurable distance | ✅ |
+| Implement matrix symmetry option | ✅ |
+| Implement matrix normalization | ✅ |
+| Handle discretized input correctly | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Testing Performed
+
+1. Package loads successfully with GLCM module
+2. GLCM computed with 13 directions, proper matrix shape (Ng × Ng × 13)
+3. All direction matrices normalize to sum = 1.0
+4. 2D GLCM works with 4 directions
+5. Auto-discretization wrapper works correctly
+
+### Git Commit
+
+```
+53585fd IMPL-GLCM-MATRIX: Implement GLCM matrix computation
+```
+
+### Next Steps
+
+The next story is **IMPL-GLCM-FEATURES** (priority 24) which will implement all 24 GLCM texture features using the matrices computed by this module.
+
+---
+

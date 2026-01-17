@@ -547,7 +547,7 @@
       "title": "Implement GLCM Matrix Computation",
       "description": "Implement Gray Level Co-occurrence Matrix computation",
       "priority": 23,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/glcm.jl module",
         "Implement GLCM matrix computation",

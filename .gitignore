@@ -1,0 +1,36 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+Manifest.toml
+docs/build/
+docs/site/
+
+# CondaPkg (Python environment)
+.CondaPkg/
+
+# Build artifacts
+deps/deps.jl
+deps/build.log
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+lcov.info
+*.info
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.bak

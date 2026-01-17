@@ -1,0 +1,9 @@
+[deps]
+# PyRadiomics for parity testing
+pyradiomics = ""
+
+# NumPy for array operations
+numpy = ""
+
+# SimpleITK for image handling (required by pyradiomics)
+simpleitk = ""

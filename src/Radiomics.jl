@@ -37,6 +37,9 @@ const VERSION = v"0.1.0"
 # Core types
 include("types.jl")
 
+# Image handling utilities
+include("image_handling.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
 # include("discretization.jl")
@@ -75,5 +78,14 @@ export FeatureResult, FeatureSet, feature_key
 
 # Export type aliases
 export ImageLike, MaskLike
+
+# Export image handling functions
+export get_voxels, get_voxels_with_coords
+export count_voxels, voxel_volume, roi_volume
+export normalize_image, normalize_image!
+export is_2d, is_3d, effective_ndims
+export validate_image_mask
+export ensure_float64, squeeze_image, get_slice
+export get_physical_size, apply_spacing, get_centroid
 
 end # module Radiomics

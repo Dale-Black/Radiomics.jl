@@ -5633,3 +5633,135 @@ The next story is **IMPL-GLCM-FEATURES** (priority 24) which will implement all 
 
 ---
 
+
+### Iteration 25 - 2026-01-17 15:14:05
+
+**Agent started** (Open: 25, Done: 23)
+
+
+
+### Iteration 25 - 2026-01-17
+
+**Story**: IMPL-GLCM-FEATURES
+**Status**: ✅ COMPLETED
+
+---
+
+## GLCM Features Implementation Summary
+
+Successfully implemented all 24 GLCM texture features in `src/glcm.jl`.
+
+### Implementation Details
+
+#### Internal Helper Functions
+
+1. **`_glcm_features_single(P, Ng)`** - Computes all 24 features for a single GLCM matrix
+   - Takes normalized GLCM matrix and number of gray levels
+   - Returns NamedTuple with all feature values
+
+2. **`_compute_mcc(P, px, Ng)`** - Computes Maximal Correlation Coefficient
+   - Builds Q matrix: Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pₓ(k))
+   - Returns square root of second largest eigenvalue
+   - Handles edge case of single gray level (returns 1.0)
+
+3. **`_aggregate_glcm_features(result)`** - Aggregates features across directions
+   - Computes features for each of 13 directions
+   - Averages using nanmean (ignores NaN values)
+
+#### Public Feature Functions (24 total)
+
+| # | Function | IBSI Code | Description |
+|---|----------|-----------|-------------|
+| 1 | `glcm_autocorrelation` | QWB0 | Texture fineness |
+| 2 | `glcm_joint_average` | 60VM | Mean gray level |
+| 3 | `glcm_cluster_prominence` | AE86 | Asymmetry measure |
+| 4 | `glcm_cluster_shade` | 7NFM | Skewness measure |
+| 5 | `glcm_cluster_tendency` | DG8W | Grouping tendency |
+| 6 | `glcm_contrast` | ACUI | Local intensity variation |
+| 7 | `glcm_correlation` | NI2N | Linear dependency |
+| 8 | `glcm_difference_average` | TF7R | Mean of difference distribution |
+| 9 | `glcm_difference_entropy` | NTRS | Randomness in differences |
+| 10 | `glcm_difference_variance` | D3YU | Heterogeneity measure |
+| 11 | `glcm_joint_energy` | 8ZQL | Angular Second Moment |
+| 12 | `glcm_joint_entropy` | TU9B | Randomness measure |
+| 13 | `glcm_imc1` | R8DG | Info correlation 1 |
+| 14 | `glcm_imc2` | JN9H | Info correlation 2 |
+| 15 | `glcm_idm` | WF0Z | Inverse Difference Moment |
+| 16 | `glcm_idmn` | 1QCO | IDM Normalized |
+| 17 | `glcm_id` | IB1Z | Inverse Difference |
+| 18 | `glcm_idn` | NDRX | ID Normalized |
+| 19 | `glcm_inverse_variance` | E8JP | Inverse Variance |
+| 20 | `glcm_maximum_probability` | GYBY | Joint Maximum |
+| 21 | `glcm_sum_average` | ZGXS | Mean of sum distribution |
+| 22 | `glcm_sum_entropy` | P6QZ | Sum distribution entropy |
+| 23 | `glcm_sum_squares` | UR99 | Joint Variance |
+| 24 | `glcm_mcc` | QCDE | Maximal Correlation Coefficient |
+
+#### Convenience Function
+
+- `glcm_features(result)` - Returns all 24 features as a NamedTuple
+- `glcm_features(image, mask; binwidth, bincount, distance, symmetric)` - Computes GLCM and extracts all features in one call
+
+### Edge Case Handling
+
+| Situation | Handling |
+|-----------|----------|
+| log(0) | Add ε (~2.2×10⁻¹⁶) before taking log |
+| σ = 0 (flat region) | Correlation returns 1 |
+| HX = HY = 0 | IMC1 returns 0 |
+| HXY > HXY2 | IMC2 returns 0 |
+| Single gray level | MCC returns 1.0 |
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Implement Autocorrelation | ✅ |
+| Implement JointAverage | ✅ |
+| Implement ClusterProminence | ✅ |
+| Implement ClusterShade | ✅ |
+| Implement ClusterTendency | ✅ |
+| Implement Contrast | ✅ |
+| Implement Correlation | ✅ |
+| Implement DifferenceAverage | ✅ |
+| Implement DifferenceEntropy | ✅ |
+| Implement DifferenceVariance | ✅ |
+| Implement JointEnergy | ✅ |
+| Implement JointEntropy | ✅ |
+| Implement Imc1 | ✅ |
+| Implement Imc2 | ✅ |
+| Implement Idm | ✅ |
+| Implement Idmn | ✅ |
+| Implement Id | ✅ |
+| Implement Idn | ✅ |
+| Implement InverseVariance | ✅ |
+| Implement MaximumProbability | ✅ |
+| Implement SumAverage | ✅ |
+| Implement SumEntropy | ✅ |
+| Implement SumSquares | ✅ |
+| Implement MCC | ✅ |
+| All functions have docstrings | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Testing Performed
+
+1. Package loads successfully with all GLCM feature functions exported
+2. GLCM features computed correctly on random test data
+3. Individual feature functions match `glcm_features()` aggregate
+4. Convenience function with auto-discretization works correctly
+
+### Files Modified
+
+1. **src/glcm.jl** - Added all 24 feature functions with docstrings
+
+### Git Commit
+
+```
+IMPL-GLCM-FEATURES: Implement all 24 GLCM texture features
+```
+
+### Next Steps
+
+The next story is **TEST-GLCM-PARITY** (priority 25) which will verify all GLCM features match PyRadiomics output exactly.
+
+---

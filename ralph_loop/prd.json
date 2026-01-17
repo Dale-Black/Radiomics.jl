@@ -567,7 +567,7 @@
       "title": "Implement GLCM Features",
       "description": "Implement all GLCM texture features",
       "priority": 24,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement Autocorrelation",
         "Implement JointAverage",

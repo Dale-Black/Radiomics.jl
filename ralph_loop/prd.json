@@ -309,7 +309,7 @@
       "title": "Implement Mask Operations",
       "description": "Implement mask validation, bounding box, and ROI extraction",
       "priority": 12,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement mask validation (binary check, connectivity)",
         "Implement bounding_box(mask) function",

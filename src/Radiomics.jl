@@ -40,6 +40,9 @@ include("types.jl")
 # Image handling utilities
 include("image_handling.jl")
 
+# Mask operations
+include("mask_operations.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
 # include("discretization.jl")
@@ -87,5 +90,15 @@ export is_2d, is_3d, effective_ndims
 export validate_image_mask
 export ensure_float64, squeeze_image, get_slice
 export get_physical_size, apply_spacing, get_centroid
+
+# Export mask operations
+export BoundingBox
+export bounding_box, bounding_box_size
+export crop_to_mask, crop_to_bbox
+export validate_mask, is_empty_mask, is_full_mask
+export mask_extent, mask_dimensionality
+export dilate_mask, erode_mask, fill_holes_2d
+export largest_connected_component
+export mask_surface_voxels, mask_interior_voxels
 
 end # module Radiomics

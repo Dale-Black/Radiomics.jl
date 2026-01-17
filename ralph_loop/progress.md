@@ -3576,3 +3576,102 @@ All 15 official tests pass via `Pkg.test()`.
 - PyRadiomics imageoperations.py: voxel extraction, normalization
 - PyRadiomics base.py: targetVoxelArray usage
 
+
+### Iteration 12 - 2026-01-17 13:05:26
+
+**Agent started** (Open: 37, Done: 11)
+
+
+---
+
+## Iteration 13: IMPL-MASK-OPERATIONS
+
+**Date**: 2026-01-17
+**Story**: IMPL-MASK-OPERATIONS - Implement Mask Operations
+**Status**: COMPLETED
+
+### Summary
+
+Implemented comprehensive mask operations for bounding box computation, cropping, validation, and morphological operations. This module provides the foundation for ROI extraction and preprocessing.
+
+### Types Implemented
+
+#### BoundingBox{N}
+A struct representing the bounding box of an ROI:
+- `lower::NTuple{N, Int}`: Lower bounds (1-indexed, inclusive)
+- `upper::NTuple{N, Int}`: Upper bounds (1-indexed, inclusive)
+- Size computation via `Base.size(bbox)`
+
+### Functions Implemented
+
+#### Bounding Box Operations
+- `bounding_box(mask; label, pad)` - Compute ROI bounding box
+- `bounding_box_size(mask; label)` - Get size without BoundingBox object
+- `crop_to_mask(image, mask; label, pad)` - Crop image and mask to ROI
+- `crop_to_bbox(image, bbox)` - Crop using pre-computed bounding box
+
+#### Mask Validation
+- `validate_mask(mask; label, check_connectivity, min_voxels)` - Comprehensive validation
+  - Returns NamedTuple with: is_valid, nvoxels, ndims_effective, bbox, is_binary, num_components, warnings
+- `is_empty_mask(mask; label)` - Check if mask is empty
+- `is_full_mask(mask; label)` - Check if mask covers entire image
+- `mask_extent(mask; label)` - Get extent (size) of ROI
+- `mask_dimensionality(mask; label)` - Determine effective dimensionality (0D/1D/2D/3D)
+
+#### Morphological Operations
+- `dilate_mask(mask; radius)` - Dilate using box structuring element
+- `erode_mask(mask; radius)` - Erode using box structuring element
+- `fill_holes_2d(mask)` - Fill holes in 2D masks
+
+#### Connected Components
+- `largest_connected_component(mask)` - Extract largest component
+- `_count_connected_components(mask)` - Internal: count components (6/4-connected)
+
+#### Surface/Interior Analysis
+- `mask_surface_voxels(mask; connectivity)` - Get boundary voxels
+- `mask_interior_voxels(mask; connectivity)` - Get interior voxels
+
+### Design Decisions
+
+1. **1-indexed coordinates**: All bounding box coordinates are 1-indexed (Julia convention)
+2. **Multiple dispatch**: All functions support Bool arrays, Integer arrays, BitArrays, and RadiomicsMask
+3. **Label support**: Integer masks support multi-label segmentation
+4. **Padding support**: bounding_box and crop_to_mask support padding (clamped to image bounds)
+5. **Pure Julia**: No external dependencies for morphology (simple implementations)
+6. **Connectivity**: 6-connected (3D) / 4-connected (2D) for component analysis
+
+### Edge Cases Handled
+
+- Empty mask: Throws ArgumentError with informative message
+- Full mask: Detected correctly by is_full_mask
+- Single voxel: Dimensionality = 0, bounding box works correctly
+- Mask with multiple labels: Label selection works, warns if not binary
+- Padding overflow: Clamped to image boundaries
+
+### Files Created/Modified
+
+- `src/mask_operations.jl` - NEW: All mask operation functions (~700 lines)
+- `src/Radiomics.jl` - Updated: includes mask_operations.jl, exports 14 functions
+- `ralph_loop/prd.json` - Updated: IMPL-MASK-OPERATIONS status to "done"
+
+### Verification
+
+All functions tested successfully:
+1. BoundingBox creation and size computation
+2. bounding_box from Bool and Integer masks
+3. bounding_box with padding
+4. bounding_box with RadiomicsMask
+5. crop_to_mask correct cropping
+6. validate_mask returns correct NamedTuple
+7. is_empty_mask and is_full_mask
+8. mask_dimensionality (0D, 1D, 2D, 3D)
+9. dilate_mask and erode_mask
+10. largest_connected_component
+11. mask_surface_voxels and mask_interior_voxels
+12. Edge case: empty mask throws ArgumentError
+13. All 15 official tests pass via `Pkg.test()`
+
+### References
+
+- PyRadiomics imageoperations.py: checkMask(), cropToTumorMask(), _checkROI()
+- PyRadiomics uses SimpleITK's LabelStatisticsImageFilter for bounding box

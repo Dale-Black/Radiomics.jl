@@ -215,7 +215,7 @@
       "title": "Initialize Git Repository",
       "description": "Set up git repository with proper configuration",
       "priority": 7,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Initialize git repo: git init",
         "Create initial commit with package structure",

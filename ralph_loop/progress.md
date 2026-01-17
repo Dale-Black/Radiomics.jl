@@ -3303,3 +3303,77 @@ ralph_loop/prd.json     # Updated SETUP-CI status to done
 
 ---
 
+
+### Iteration 9 - 2026-01-17 12:34:39
+
+**Agent started** (Open: 40, Done: 8)
+
+
+---
+
+## Iteration 4: SETUP-TEST-HARNESS
+
+**Date**: 2026-01-17
+**Story**: SETUP-TEST-HARNESS - Implement PythonCall Test Harness
+**Status**: COMPLETED
+
+### Summary
+
+Implemented a comprehensive test harness for PyRadiomics parity testing using PythonCall.jl. The harness allows Julia implementations to be verified against the reference PyRadiomics Python library.
+
+### Completed Tasks
+
+1. **Created test/test_utils.jl** with the following utilities:
+   - `random_image_mask(seed, size)` - Generates deterministic random test images and masks
+   - `random_image_mask_integer(seed, size)` - Integer version for discretization testing
+   - `julia_array_to_sitk(image, mask)` - Converts Julia arrays to SimpleITK format
+   - `pyradiomics_feature(class, name, image, mask)` - Extracts a single feature from PyRadiomics
+   - `pyradiomics_extract(class, image, mask)` - Extracts all features from a feature class
+   - `pyradiomics_extract_all(image, mask)` - Extracts all features from all classes
+   - `compare_features(julia_val, python_val)` - Compares values with tolerance
+   - `compare_feature_dicts(julia_dict, python_dict)` - Batch comparison
+   - `verify_pyradiomics_available()` - Checks if PyRadiomics is installed
+   - `get_tolerance(feature_class)` - Returns appropriate tolerance for each feature class
+
+2. **Configured CondaPkg dependencies programmatically**:
+   - Dependencies are added before PythonCall is loaded
+   - pyradiomics 3.0.1 is installed via pip with --no-build-isolation
+   - Python version constrained to 3.10-3.11 for compatibility
+   - All dependencies (numpy, simpleitk, pywavelets, etc.) properly configured
+
+3. **Updated test/runtests.jl** with test harness verification:
+   - PyRadiomics availability check
+   - Random data generation tests (reproducibility, dimensions, types)
+   - PyRadiomics feature extraction test
+
+4. **All 15 tests pass** via `Pkg.test()`:
+   - Package loads correctly
+   - Test harness works correctly
+   - PyRadiomics integration verified
+
+### Key Technical Decisions
+
+1. **Dependencies installed programmatically**: Rather than relying on CondaPkg.toml in the test directory (which isn't picked up by Pkg.test() temp environments), dependencies are added via `CondaPkg.add()` before PythonCall is loaded.
+
+2. **pyradiomics via pip**: pyradiomics is not available on conda-forge, so it's installed via pip after the conda environment is resolved. The `--no-build-isolation` flag ensures numpy is available during the build.
+
+3. **Python version constraint**: Python 3.10-3.11 required for pyradiomics compatibility.
+
+4. **Numpy type handling**: PyRadiomics returns numpy scalar types that need special handling (`pyfloat()`) for conversion to Julia Float64.
+
+5. **Class name mapping**: PyRadiomics uses CamelCase class names (e.g., "RadiomicsFirstOrder") which differ from the lowercase module names.
+
+### Files Modified
+
+- `test/test_utils.jl` - NEW: Comprehensive test utilities (600+ lines)
+- `test/runtests.jl` - Updated with test harness verification
+- `test/Project.toml` - Removed explicit Radiomics dependency (handled by Pkg.test())
+- `test/CondaPkg.toml` - Base conda dependencies (also added programmatically)
+- `~/.julia/environments/v1.11/CondaPkg.toml` - Global environment configured for development
+
+### References
+
+- PythonCall.jl: https://github.com/JuliaPy/PythonCall.jl
+- CondaPkg.jl: https://github.com/JuliaPy/CondaPkg.jl
+- PyRadiomics: https://github.com/AIM-Harvard/pyradiomics
+

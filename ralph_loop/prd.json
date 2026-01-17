@@ -250,7 +250,7 @@
       "title": "Implement PythonCall Test Harness",
       "description": "Create reusable test utilities for PyRadiomics comparison",
       "priority": 9,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_utils.jl with helper functions",
         "Implement pyradiomics_extract() wrapper function",

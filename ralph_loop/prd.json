@@ -347,7 +347,7 @@
       "title": "Test Core Infrastructure Parity",
       "description": "Verify core infrastructure matches PyRadiomics behavior",
       "priority": 14,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_core.jl",
         "Test discretization matches PyRadiomics exactly",

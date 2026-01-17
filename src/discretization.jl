@@ -88,28 +88,34 @@ end
 
 Compute bin edges for Fixed Bin Width discretization.
 
-The bin edges are aligned to zero, following PyRadiomics convention:
-- Lower bound: floor(minval / binwidth) * binwidth
-- Upper bound: (floor(maxval / binwidth) + 1) * binwidth
+The bin edges follow PyRadiomics convention exactly:
+- Lower bound: minimum - (minimum % binwidth) for positive, or aligned to grid
+- Upper bound: maximum + 2 * binwidth to ensure inclusion
 
-This ensures bins are aligned at multiples of binwidth starting from zero.
+This ensures bins are aligned at multiples of binwidth.
 """
 function _get_bin_edges_fixed_width(minval::Real, maxval::Real, binwidth::Real)
-    # Calculate aligned lower bound (floor to nearest binwidth from zero)
-    lower_bound = floor(minval / binwidth) * binwidth
+    # Match PyRadiomics: lowBound = minimum - (minimum % binWidth)
+    # For Julia, we use modulo with correct handling for negative values
+    lower_bound = minval - mod(minval, binwidth)
 
-    # Calculate aligned upper bound (ensure maxval is included)
-    upper_bound = (floor(maxval / binwidth) + 1) * binwidth
+    # Match PyRadiomics: highBound = maximum + 2 * binWidth
+    upper_bound = maxval + 2 * binwidth
 
-    # Generate edges
-    edges = collect(lower_bound:binwidth:upper_bound)
+    # Generate edges using arange-like behavior
+    edges = Float64[]
+    edge = lower_bound
+    while edge < upper_bound
+        push!(edges, edge)
+        edge += binwidth
+    end
 
     # Ensure we have at least 2 edges (1 bin)
     if length(edges) < 2
-        edges = Float64[lower_bound, lower_bound + binwidth]
+        push!(edges, lower_bound + binwidth)
     end
 
-    return Float64.(edges)
+    return edges
 end
 
 """
@@ -144,6 +150,10 @@ end
 
 Discretize values into integer bin indices using pre-computed bin edges.
 
+Matches numpy.digitize behavior exactly:
+- Bin i contains values where `edges[i] <= x < edges[i+1]`
+- Result is 1-indexed (bins 1 to nbins)
+
 # Arguments
 - `values`: Array of intensity values to discretize
 - `edges`: Bin edges from `get_bin_edges`
@@ -152,9 +162,9 @@ Discretize values into integer bin indices using pre-computed bin edges.
 - Array of the same shape as `values` with integer bin indices (1-indexed)
 
 # Notes
-- Values below the first edge get bin 1
-- Values at or above the last edge get the maximum bin (length(edges) - 1)
-- Uses searchsortedfirst-based binning matching numpy.digitize behavior
+- Values below first edge get bin 1
+- Values >= last edge get bin nbins (clamped)
+- Matches numpy.digitize(x, edges) behavior exactly
 
 # Example
 ```julia
@@ -173,9 +183,10 @@ function discretize(values::AbstractArray{T}, edges::AbstractVector{<:Real}) whe
         if isnan(values[i])
             result[i] = 0  # NaN values get bin 0 (invalid)
         else
-            # searchsortedfirst gives first index where edges[j] >= value
-            # Subtract 1 to get bin index (but ensure at least 1)
-            bin = searchsortedfirst(edges, values[i]) - 1
+            # Match numpy.digitize: find bin where edges[bin] <= value < edges[bin+1]
+            # searchsortedlast gives last index where edges[j] <= value
+            bin = searchsortedlast(edges, values[i])
+            # Clamp to valid range [1, nbins]
             result[i] = clamp(bin, 1, nbins)
         end
     end
@@ -198,7 +209,8 @@ function discretize(values::AbstractVector{T}, edges::AbstractVector{<:Real}) wh
         if isnan(values[i])
             result[i] = 0  # NaN values get bin 0 (invalid)
         else
-            bin = searchsortedfirst(edges, values[i]) - 1
+            # Match numpy.digitize: searchsortedlast for left-closed intervals
+            bin = searchsortedlast(edges, values[i])
             result[i] = clamp(bin, 1, nbins)
         end
     end

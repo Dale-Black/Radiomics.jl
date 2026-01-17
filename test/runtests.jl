@@ -54,8 +54,10 @@ include("test_utils.jl")
         end
     end
 
+    # Core infrastructure tests
+    include("test_core.jl")
+
     # Feature class tests will be included as they are implemented
-    # include("test_core.jl")
     # include("test_firstorder.jl")
     # include("test_shape.jl")
     # include("test_glcm.jl")

@@ -65,7 +65,9 @@ include("test_utils.jl")
 
     # GLCM feature parity tests
     include("test_glcm.jl")
-    # include("test_glrlm.jl")
+
+    # GLRLM feature parity tests
+    include("test_glrlm.jl")
     # include("test_glszm.jl")
     # include("test_ngtdm.jl")
     # include("test_gldm.jl")

@@ -6380,3 +6380,82 @@ src/glrlm.jl  - Added ~400 lines of feature implementation code
 | Commit | With descriptive message | ✅ |
 
 ---
+
+### Iteration 30 - 2026-01-17 15:50:22
+
+**Agent started** (Open: 20, Done: 28)
+
+
+
+### Iteration 31 - 2026-01-17
+
+**Story**: TEST-GLRLM-PARITY
+**Status**: ✅ COMPLETED
+
+### Accomplishments
+
+Created comprehensive GLRLM parity test suite verifying all 16 features match PyRadiomics:
+
+1. **Created test/test_glrlm.jl** (~600 lines) with:
+   - Individual tests for each of 16 GLRLM features
+   - Tests with multiple random seeds (42, 123, 456)
+   - Tests with multiple array sizes (16³, 32³)
+   - Different binwidth settings (16, 25, 32, 64)
+   - Edge cases (small mask, high intensity, integer values)
+   - 2D image tests
+   - Feature consistency tests (mathematical relationships)
+   - Comprehensive parity summary report
+
+2. **PyRadiomics Integration**:
+   - Helper function `get_pyradiomics_glrlm()` extracts all GLRLM features
+   - Helper function `get_julia_glrlm_features()` computes all Julia features
+   - Feature name mapping between Julia (snake_case) and PyRadiomics (CamelCase)
+
+3. **Test Results**:
+   - All 16 GLRLM features pass parity tests
+   - Tolerance: rtol=1e-10, atol=1e-12
+   - 1064 total tests pass (including all prior test suites)
+
+4. **Updated test/runtests.jl**:
+   - Uncommented and enabled GLRLM test inclusion
+
+### GLRLM Features Tested (All 16)
+
+| Feature | Julia Function | PyRadiomics | Status |
+|---------|---------------|-------------|--------|
+| ShortRunEmphasis | `glrlm_short_run_emphasis` | ShortRunEmphasis | ✅ |
+| LongRunEmphasis | `glrlm_long_run_emphasis` | LongRunEmphasis | ✅ |
+| GrayLevelNonUniformity | `glrlm_gray_level_non_uniformity` | GrayLevelNonUniformity | ✅ |
+| GrayLevelNonUniformityNormalized | `glrlm_gray_level_non_uniformity_normalized` | GrayLevelNonUniformityNormalized | ✅ |
+| RunLengthNonUniformity | `glrlm_run_length_non_uniformity` | RunLengthNonUniformity | ✅ |
+| RunLengthNonUniformityNormalized | `glrlm_run_length_non_uniformity_normalized` | RunLengthNonUniformityNormalized | ✅ |
+| RunPercentage | `glrlm_run_percentage` | RunPercentage | ✅ |
+| GrayLevelVariance | `glrlm_gray_level_variance` | GrayLevelVariance | ✅ |
+| RunVariance | `glrlm_run_variance` | RunVariance | ✅ |
+| RunEntropy | `glrlm_run_entropy` | RunEntropy | ✅ |
+| LowGrayLevelRunEmphasis | `glrlm_low_gray_level_run_emphasis` | LowGrayLevelRunEmphasis | ✅ |
+| HighGrayLevelRunEmphasis | `glrlm_high_gray_level_run_emphasis` | HighGrayLevelRunEmphasis | ✅ |
+| ShortRunLowGrayLevelEmphasis | `glrlm_short_run_low_gray_level_emphasis` | ShortRunLowGrayLevelEmphasis | ✅ |
+| ShortRunHighGrayLevelEmphasis | `glrlm_short_run_high_gray_level_emphasis` | ShortRunHighGrayLevelEmphasis | ✅ |
+| LongRunLowGrayLevelEmphasis | `glrlm_long_run_low_gray_level_emphasis` | LongRunLowGrayLevelEmphasis | ✅ |
+| LongRunHighGrayLevelEmphasis | `glrlm_long_run_high_gray_level_emphasis` | LongRunHighGrayLevelEmphasis | ✅ |
+
+### Files Created/Modified
+
+```
+test/
+├── test_glrlm.jl   # NEW - GLRLM parity tests (~600 lines)
+└── runtests.jl     # Modified - enabled GLRLM test inclusion
+```
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create test/test_glrlm.jl | ✅ |
+| Test GLRLM matrix matches PyRadiomics | ✅ |
+| Test EVERY GLRLM feature against PyRadiomics | ✅ (all 16) |
+| All tests pass within tolerance | ✅ (rtol=1e-10) |
+| Commit test file with descriptive message | ✅ |
+
+---

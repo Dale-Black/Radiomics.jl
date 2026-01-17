@@ -690,7 +690,7 @@
       "title": "Test GLRLM Feature Parity",
       "description": "Verify all GLRLM features match PyRadiomics",
       "priority": 29,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_glrlm.jl",
         "Test GLRLM matrix matches PyRadiomics",

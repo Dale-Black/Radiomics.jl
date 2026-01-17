@@ -57,9 +57,11 @@ include("shape.jl")
 # Gray Level Co-occurrence Matrix (GLCM) features
 include("glcm.jl")
 
+# Gray Level Run Length Matrix (GLRLM) features
+include("glrlm.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("glrlm.jl")
 # include("glszm.jl")
 # include("ngtdm.jl")
 # include("gldm.jl")
@@ -147,5 +149,12 @@ export compute_glcm, compute_glcm_2d
 export GLCM_DIRECTIONS_3D, GLCM_DIRECTIONS_2D
 export get_averaged_glcm, get_merged_glcm
 export glcm_num_gray_levels, glcm_num_directions
+
+# Export GLRLM computation functions and types
+export GLRLMResult, GLRLMResult2D
+export compute_glrlm, compute_glrlm_2d
+export GLRLM_DIRECTIONS_3D, GLRLM_DIRECTIONS_2D
+export glrlm_num_gray_levels, glrlm_num_directions, glrlm_max_run_length
+export glrlm_num_runs, glrlm_num_voxels
 
 end # module Radiomics

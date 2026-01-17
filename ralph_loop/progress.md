@@ -6280,3 +6280,103 @@ src/
 
 ---
 
+
+### Iteration 29 - 2026-01-17 15:46:33
+
+**Agent started** (Open: 21, Done: 27)
+
+
+### Iteration 30 - 2026-01-17
+
+**Story**: IMPL-GLRLM-FEATURES
+**Status**: ✅ COMPLETED
+
+### Accomplishments
+
+Implemented all 16 GLRLM (Gray Level Run Length Matrix) texture features:
+
+1. **Run Length Emphasis Features**:
+   - `glrlm_short_run_emphasis()` - SRE: Measures short run distribution
+   - `glrlm_long_run_emphasis()` - LRE: Measures long run distribution
+
+2. **Non-Uniformity Features**:
+   - `glrlm_gray_level_non_uniformity()` - GLN: Gray level variability
+   - `glrlm_gray_level_non_uniformity_normalized()` - GLNN: Normalized GLN
+   - `glrlm_run_length_non_uniformity()` - RLN: Run length variability
+   - `glrlm_run_length_non_uniformity_normalized()` - RLNN: Normalized RLN
+
+3. **Run Percentage**:
+   - `glrlm_run_percentage()` - RP: Ratio of runs to voxels
+
+4. **Variance Features**:
+   - `glrlm_gray_level_variance()` - GLV: Gray level variance
+   - `glrlm_run_variance()` - RV: Run length variance
+
+5. **Entropy**:
+   - `glrlm_run_entropy()` - RE: Randomness in run distribution
+
+6. **Gray Level Emphasis Features**:
+   - `glrlm_low_gray_level_run_emphasis()` - LGLRE: Low gray level emphasis
+   - `glrlm_high_gray_level_run_emphasis()` - HGLRE: High gray level emphasis
+
+7. **Combined Emphasis Features**:
+   - `glrlm_short_run_low_gray_level_emphasis()` - SRLGLE
+   - `glrlm_short_run_high_gray_level_emphasis()` - SRHGLE
+   - `glrlm_long_run_low_gray_level_emphasis()` - LRLGLE
+   - `glrlm_long_run_high_gray_level_emphasis()` - LRHGLE
+
+### Implementation Details
+
+1. **Aggregation Method**: Mean across all directions using nanmean (matching PyRadiomics default)
+   - Each feature is computed for each of the 13 directions in 3D (4 in 2D)
+   - Final value is the average across all directions, excluding NaN values
+
+2. **Helper Functions**:
+   - `_glrlm_feature_single_direction()`: Computes feature for one direction
+   - `_glrlm_feature_aggregated()`: Handles direction aggregation with nanmean
+
+3. **Normalization**:
+   - Features divide by Ns (total runs) as per IBSI formulas
+   - Variance features use normalized matrix p(i,j) = P(i,j) / Ns
+
+4. **Edge Cases**:
+   - Returns NaN when Ns = 0 (no runs in a direction)
+   - Uses GLRLM_EPSILON ≈ 2.2×10⁻¹⁶ in entropy to prevent log(0)
+
+### Verification
+
+- All 16 feature functions exported and callable
+- Package loads successfully
+- Features compute reasonable values on test data
+- Ready for parity testing against PyRadiomics
+
+### Files Modified
+
+```
+src/glrlm.jl  - Added ~400 lines of feature implementation code
+```
+
+### Acceptance Criteria Verification
+
+| Feature | Function | Status |
+|---------|----------|--------|
+| ShortRunEmphasis | `glrlm_short_run_emphasis` | ✅ |
+| LongRunEmphasis | `glrlm_long_run_emphasis` | ✅ |
+| GrayLevelNonUniformity | `glrlm_gray_level_non_uniformity` | ✅ |
+| GrayLevelNonUniformityNormalized | `glrlm_gray_level_non_uniformity_normalized` | ✅ |
+| RunLengthNonUniformity | `glrlm_run_length_non_uniformity` | ✅ |
+| RunLengthNonUniformityNormalized | `glrlm_run_length_non_uniformity_normalized` | ✅ |
+| RunPercentage | `glrlm_run_percentage` | ✅ |
+| GrayLevelVariance | `glrlm_gray_level_variance` | ✅ |
+| RunVariance | `glrlm_run_variance` | ✅ |
+| RunEntropy | `glrlm_run_entropy` | ✅ |
+| LowGrayLevelRunEmphasis | `glrlm_low_gray_level_run_emphasis` | ✅ |
+| HighGrayLevelRunEmphasis | `glrlm_high_gray_level_run_emphasis` | ✅ |
+| ShortRunLowGrayLevelEmphasis | `glrlm_short_run_low_gray_level_emphasis` | ✅ |
+| ShortRunHighGrayLevelEmphasis | `glrlm_short_run_high_gray_level_emphasis` | ✅ |
+| LongRunLowGrayLevelEmphasis | `glrlm_long_run_low_gray_level_emphasis` | ✅ |
+| LongRunHighGrayLevelEmphasis | `glrlm_long_run_high_gray_level_emphasis` | ✅ |
+| Docstrings | All functions documented | ✅ |
+| Commit | With descriptive message | ✅ |
+
+---

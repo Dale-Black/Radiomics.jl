@@ -660,7 +660,7 @@
       "title": "Implement GLRLM Features",
       "description": "Implement all GLRLM texture features",
       "priority": 28,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement ShortRunEmphasis",
         "Implement LongRunEmphasis",

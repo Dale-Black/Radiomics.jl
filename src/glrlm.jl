@@ -630,6 +630,618 @@ function _glrlm_marginals(P::AbstractMatrix{Float64})
 end
 
 #==============================================================================#
+# GLRLM Feature Computation - Helper Functions
+#==============================================================================#
+
+"""
+    _glrlm_feature_single_direction(P::AbstractMatrix{Float64}, Ns::Int, Np::Int,
+                                    Ng::Int, Nr::Int, feature_func::Function) -> Float64
+
+Compute a GLRLM feature for a single direction.
+
+# Arguments
+- `P`: GLRLM matrix (Ng × Nr) for one direction
+- `Ns`: Number of runs in this direction
+- `Np`: Number of voxels in runs for this direction
+- `Ng`: Number of gray levels
+- `Nr`: Maximum run length
+- `feature_func`: Function to compute the feature value
+
+# Returns
+Feature value, or NaN if Ns = 0
+"""
+function _glrlm_feature_single_direction(P::AbstractMatrix{Float64}, Ns::Int, Np::Int,
+                                         Ng::Int, Nr::Int, feature_func::Function)
+    if Ns == 0
+        return NaN
+    end
+    return feature_func(P, Ns, Np, Ng, Nr)
+end
+
+"""
+    _glrlm_feature_aggregated(result::Union{GLRLMResult, GLRLMResult2D},
+                              feature_func::Function) -> Float64
+
+Compute a GLRLM feature aggregated across all directions using nanmean.
+
+This matches PyRadiomics' default aggregation approach: compute the feature
+for each direction separately, then average using nanmean.
+
+# Arguments
+- `result`: GLRLM computation result
+- `feature_func`: Function that takes (P, Ns, Np, Ng, Nr) and returns a Float64
+
+# Returns
+Mean feature value across all directions (NaN values excluded)
+"""
+function _glrlm_feature_aggregated(result::Union{GLRLMResult, GLRLMResult2D},
+                                   feature_func::Function)
+    Ng = result.Ng
+    Nr = result.Nr
+    num_dirs = result isa GLRLMResult ? result.num_directions : 4
+
+    values = Float64[]
+    for d in 1:num_dirs
+        P = @view result.matrices[:, :, d]
+        Ns = result.Ns[d]
+        Np = result.Np[d]
+
+        val = _glrlm_feature_single_direction(P, Ns, Np, Ng, Nr, feature_func)
+        if !isnan(val)
+            push!(values, val)
+        end
+    end
+
+    return isempty(values) ? NaN : mean(values)
+end
+
+#==============================================================================#
+# GLRLM Features - Run Length Emphasis Features
+#==============================================================================#
+
+"""
+    glrlm_short_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Short Run Emphasis (SRE): Measures the distribution of short runs.
+
+# Mathematical Formula
+```
+SRE = (1/Nr) × ΣᵢΣⱼ P(i,j) / j²
+```
+
+where:
+- P(i,j) is the number of runs of gray level i with length j
+- Nr is the total number of runs (Ns)
+
+Higher values indicate more short runs and finer textures.
+
+# References
+- PyRadiomics: glrlm.py:getShortRunEmphasisFeatureValue
+- IBSI: Grey level run length based features - Short runs emphasis
+"""
+function glrlm_short_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _sre(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for j in 1:Nr
+            j_sq = j * j
+            for i in 1:Ng
+                total += P[i, j] / j_sq
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _sre)
+end
+
+"""
+    glrlm_long_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Long Run Emphasis (LRE): Measures the distribution of long runs.
+
+# Mathematical Formula
+```
+LRE = (1/Nr) × ΣᵢΣⱼ P(i,j) × j²
+```
+
+Higher values indicate more long runs and coarser textures.
+
+# References
+- PyRadiomics: glrlm.py:getLongRunEmphasisFeatureValue
+- IBSI: Grey level run length based features - Long runs emphasis
+"""
+function glrlm_long_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _lre(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for j in 1:Nr
+            j_sq = j * j
+            for i in 1:Ng
+                total += P[i, j] * j_sq
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _lre)
+end
+
+#==============================================================================#
+# GLRLM Features - Non-Uniformity Features
+#==============================================================================#
+
+"""
+    glrlm_gray_level_non_uniformity(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Gray Level Non-Uniformity (GLN): Measures variability of gray level intensity.
+
+# Mathematical Formula
+```
+GLN = (1/Ns) × Σᵢ (Σⱼ P(i,j))²
+```
+
+where Σⱼ P(i,j) is the gray level marginal (pg).
+
+Lower values indicate more homogeneous gray level distribution.
+
+# References
+- PyRadiomics: glrlm.py:getGrayLevelNonUniformityFeatureValue
+- IBSI: Grey level run length based features - Grey level non-uniformity
+"""
+function glrlm_gray_level_non_uniformity(result::Union{GLRLMResult, GLRLMResult2D})
+    function _gln(P, Ns, Np, Ng, Nr)
+        # pg(i) = Σⱼ P(i,j) - gray level marginal
+        total = 0.0
+        @inbounds for i in 1:Ng
+            pg_i = 0.0
+            for j in 1:Nr
+                pg_i += P[i, j]
+            end
+            total += pg_i * pg_i
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _gln)
+end
+
+"""
+    glrlm_gray_level_non_uniformity_normalized(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Gray Level Non-Uniformity Normalized (GLNN): Normalized version of GLN.
+
+# Mathematical Formula
+```
+GLNN = (1/Ns²) × Σᵢ (Σⱼ P(i,j))²
+```
+
+Normalizing by Ns² makes the feature less sensitive to the number of runs.
+
+# References
+- PyRadiomics: glrlm.py:getGrayLevelNonUniformityNormalizedFeatureValue
+- IBSI: Grey level run length based features - Normalised grey level non-uniformity
+"""
+function glrlm_gray_level_non_uniformity_normalized(result::Union{GLRLMResult, GLRLMResult2D})
+    function _glnn(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            pg_i = 0.0
+            for j in 1:Nr
+                pg_i += P[i, j]
+            end
+            total += pg_i * pg_i
+        end
+        return total / (Ns * Ns)
+    end
+    return _glrlm_feature_aggregated(result, _glnn)
+end
+
+"""
+    glrlm_run_length_non_uniformity(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Run Length Non-Uniformity (RLN): Measures variability of run lengths.
+
+# Mathematical Formula
+```
+RLN = (1/Ns) × Σⱼ (Σᵢ P(i,j))²
+```
+
+where Σᵢ P(i,j) is the run length marginal (pr).
+
+Lower values indicate more homogeneous run length distribution.
+
+# References
+- PyRadiomics: glrlm.py:getRunLengthNonUniformityFeatureValue
+- IBSI: Grey level run length based features - Run length non-uniformity
+"""
+function glrlm_run_length_non_uniformity(result::Union{GLRLMResult, GLRLMResult2D})
+    function _rln(P, Ns, Np, Ng, Nr)
+        # pr(j) = Σᵢ P(i,j) - run length marginal
+        total = 0.0
+        @inbounds for j in 1:Nr
+            pr_j = 0.0
+            for i in 1:Ng
+                pr_j += P[i, j]
+            end
+            total += pr_j * pr_j
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _rln)
+end
+
+"""
+    glrlm_run_length_non_uniformity_normalized(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Run Length Non-Uniformity Normalized (RLNN): Normalized version of RLN.
+
+# Mathematical Formula
+```
+RLNN = (1/Ns²) × Σⱼ (Σᵢ P(i,j))²
+```
+
+# References
+- PyRadiomics: glrlm.py:getRunLengthNonUniformityNormalizedFeatureValue
+- IBSI: Grey level run length based features - Normalised run length non-uniformity
+"""
+function glrlm_run_length_non_uniformity_normalized(result::Union{GLRLMResult, GLRLMResult2D})
+    function _rlnn(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for j in 1:Nr
+            pr_j = 0.0
+            for i in 1:Ng
+                pr_j += P[i, j]
+            end
+            total += pr_j * pr_j
+        end
+        return total / (Ns * Ns)
+    end
+    return _glrlm_feature_aggregated(result, _rlnn)
+end
+
+#==============================================================================#
+# GLRLM Features - Run Percentage
+#==============================================================================#
+
+"""
+    glrlm_run_percentage(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Run Percentage (RP): Ratio of total runs to total voxels.
+
+# Mathematical Formula
+```
+RP = Ns / Np
+```
+
+where:
+- Ns is the total number of runs
+- Np is the total number of voxels in the ROI
+
+Higher values indicate more runs (shorter run lengths on average).
+Maximum value is 1.0 when all runs have length 1.
+
+# References
+- PyRadiomics: glrlm.py:getRunPercentageFeatureValue
+- IBSI: Grey level run length based features - Run percentage
+"""
+function glrlm_run_percentage(result::Union{GLRLMResult, GLRLMResult2D})
+    function _rp(P, Ns, Np, Ng, Nr)
+        if Np == 0
+            return NaN
+        end
+        return Float64(Ns) / Float64(Np)
+    end
+    return _glrlm_feature_aggregated(result, _rp)
+end
+
+#==============================================================================#
+# GLRLM Features - Variance Features
+#==============================================================================#
+
+"""
+    glrlm_gray_level_variance(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Gray Level Variance (GLV): Measures variance in gray level intensities.
+
+# Mathematical Formula
+```
+GLV = ΣᵢΣⱼ p(i,j) × (i - μ)²
+where μ = ΣᵢΣⱼ p(i,j) × i
+```
+
+where p(i,j) = P(i,j) / Ns is the normalized GLRLM.
+
+# References
+- PyRadiomics: glrlm.py:getGrayLevelVarianceFeatureValue
+- IBSI: Grey level run length based features - Grey level variance
+"""
+function glrlm_gray_level_variance(result::Union{GLRLMResult, GLRLMResult2D})
+    function _glv(P, Ns, Np, Ng, Nr)
+        # Compute mean gray level: μ = Σᵢ Σⱼ p(i,j) × i
+        mu = 0.0
+        @inbounds for i in 1:Ng
+            for j in 1:Nr
+                mu += (P[i, j] / Ns) * i
+            end
+        end
+
+        # Compute variance: Σᵢ Σⱼ p(i,j) × (i - μ)²
+        variance = 0.0
+        @inbounds for i in 1:Ng
+            diff_sq = (i - mu)^2
+            for j in 1:Nr
+                variance += (P[i, j] / Ns) * diff_sq
+            end
+        end
+
+        return variance
+    end
+    return _glrlm_feature_aggregated(result, _glv)
+end
+
+"""
+    glrlm_run_variance(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Run Variance (RV): Measures variance in run lengths.
+
+# Mathematical Formula
+```
+RV = ΣᵢΣⱼ p(i,j) × (j - μ)²
+where μ = ΣᵢΣⱼ p(i,j) × j
+```
+
+where p(i,j) = P(i,j) / Ns is the normalized GLRLM.
+
+# References
+- PyRadiomics: glrlm.py:getRunVarianceFeatureValue
+- IBSI: Grey level run length based features - Run length variance
+"""
+function glrlm_run_variance(result::Union{GLRLMResult, GLRLMResult2D})
+    function _rv(P, Ns, Np, Ng, Nr)
+        # Compute mean run length: μ = Σᵢ Σⱼ p(i,j) × j
+        mu = 0.0
+        @inbounds for i in 1:Ng
+            for j in 1:Nr
+                mu += (P[i, j] / Ns) * j
+            end
+        end
+
+        # Compute variance: Σᵢ Σⱼ p(i,j) × (j - μ)²
+        variance = 0.0
+        @inbounds for i in 1:Ng
+            for j in 1:Nr
+                variance += (P[i, j] / Ns) * (j - mu)^2
+            end
+        end
+
+        return variance
+    end
+    return _glrlm_feature_aggregated(result, _rv)
+end
+
+#==============================================================================#
+# GLRLM Features - Entropy
+#==============================================================================#
+
+"""
+    glrlm_run_entropy(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Run Entropy (RE): Measures uncertainty/randomness in run distribution.
+
+# Mathematical Formula
+```
+RE = -ΣᵢΣⱼ p(i,j) × log₂(p(i,j) + ε)
+```
+
+where p(i,j) = P(i,j) / Ns and ε ≈ 2.2×10⁻¹⁶ prevents log(0).
+
+Higher values indicate more heterogeneous run distribution.
+
+# References
+- PyRadiomics: glrlm.py:getRunEntropyFeatureValue
+- IBSI: Grey level run length based features - Run entropy
+"""
+function glrlm_run_entropy(result::Union{GLRLMResult, GLRLMResult2D})
+    function _re(P, Ns, Np, Ng, Nr)
+        entropy = 0.0
+        @inbounds for i in 1:Ng
+            for j in 1:Nr
+                p_ij = P[i, j] / Ns
+                if p_ij > 0
+                    entropy -= p_ij * log2(p_ij + GLRLM_EPSILON)
+                end
+            end
+        end
+        return entropy
+    end
+    return _glrlm_feature_aggregated(result, _re)
+end
+
+#==============================================================================#
+# GLRLM Features - Gray Level Emphasis Features
+#==============================================================================#
+
+"""
+    glrlm_low_gray_level_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Low Gray Level Run Emphasis (LGLRE): Measures distribution of low gray levels.
+
+# Mathematical Formula
+```
+LGLRE = (1/Ns) × ΣᵢΣⱼ P(i,j) / i²
+```
+
+Higher values indicate more runs with low gray levels.
+
+# References
+- PyRadiomics: glrlm.py:getLowGrayLevelRunEmphasisFeatureValue
+- IBSI: Grey level run length based features - Low grey level run emphasis
+"""
+function glrlm_low_gray_level_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _lglre(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            i_sq = i * i
+            for j in 1:Nr
+                total += P[i, j] / i_sq
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _lglre)
+end
+
+"""
+    glrlm_high_gray_level_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+High Gray Level Run Emphasis (HGLRE): Measures distribution of high gray levels.
+
+# Mathematical Formula
+```
+HGLRE = (1/Ns) × ΣᵢΣⱼ P(i,j) × i²
+```
+
+Higher values indicate more runs with high gray levels.
+
+# References
+- PyRadiomics: glrlm.py:getHighGrayLevelRunEmphasisFeatureValue
+- IBSI: Grey level run length based features - High grey level run emphasis
+"""
+function glrlm_high_gray_level_run_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _hglre(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            i_sq = i * i
+            for j in 1:Nr
+                total += P[i, j] * i_sq
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _hglre)
+end
+
+#==============================================================================#
+# GLRLM Features - Combined Emphasis Features
+#==============================================================================#
+
+"""
+    glrlm_short_run_low_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Short Run Low Gray Level Emphasis (SRLGLE): Joint distribution of short runs and low gray levels.
+
+# Mathematical Formula
+```
+SRLGLE = (1/Ns) × ΣᵢΣⱼ P(i,j) / (i² × j²)
+```
+
+Higher values indicate more short runs with low gray levels.
+
+# References
+- PyRadiomics: glrlm.py:getShortRunLowGrayLevelEmphasisFeatureValue
+- IBSI: Grey level run length based features - Short run low grey level emphasis
+"""
+function glrlm_short_run_low_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _srlgle(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            i_sq = i * i
+            for j in 1:Nr
+                total += P[i, j] / (i_sq * j * j)
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _srlgle)
+end
+
+"""
+    glrlm_short_run_high_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Short Run High Gray Level Emphasis (SRHGLE): Joint distribution of short runs and high gray levels.
+
+# Mathematical Formula
+```
+SRHGLE = (1/Ns) × ΣᵢΣⱼ P(i,j) × i² / j²
+```
+
+Higher values indicate more short runs with high gray levels.
+
+# References
+- PyRadiomics: glrlm.py:getShortRunHighGrayLevelEmphasisFeatureValue
+- IBSI: Grey level run length based features - Short run high grey level emphasis
+"""
+function glrlm_short_run_high_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _srhgle(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            i_sq = i * i
+            for j in 1:Nr
+                total += P[i, j] * i_sq / (j * j)
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _srhgle)
+end
+
+"""
+    glrlm_long_run_low_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Long Run Low Gray Level Emphasis (LRLGLE): Joint distribution of long runs and low gray levels.
+
+# Mathematical Formula
+```
+LRLGLE = (1/Ns) × ΣᵢΣⱼ P(i,j) × j² / i²
+```
+
+Higher values indicate more long runs with low gray levels.
+
+# References
+- PyRadiomics: glrlm.py:getLongRunLowGrayLevelEmphasisFeatureValue
+- IBSI: Grey level run length based features - Long run low grey level emphasis
+"""
+function glrlm_long_run_low_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _lrlgle(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            i_sq = i * i
+            for j in 1:Nr
+                total += P[i, j] * (j * j) / i_sq
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _lrlgle)
+end
+
+"""
+    glrlm_long_run_high_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D}) -> Float64
+
+Long Run High Gray Level Emphasis (LRHGLE): Joint distribution of long runs and high gray levels.
+
+# Mathematical Formula
+```
+LRHGLE = (1/Ns) × ΣᵢΣⱼ P(i,j) × i² × j²
+```
+
+Higher values indicate more long runs with high gray levels.
+
+# References
+- PyRadiomics: glrlm.py:getLongRunHighGrayLevelEmphasisFeatureValue
+- IBSI: Grey level run length based features - Long run high grey level emphasis
+"""
+function glrlm_long_run_high_gray_level_emphasis(result::Union{GLRLMResult, GLRLMResult2D})
+    function _lrhgle(P, Ns, Np, Ng, Nr)
+        total = 0.0
+        @inbounds for i in 1:Ng
+            i_sq = i * i
+            for j in 1:Nr
+                total += P[i, j] * i_sq * (j * j)
+            end
+        end
+        return total / Ns
+    end
+    return _glrlm_feature_aggregated(result, _lrhgle)
+end
+
+#==============================================================================#
 # Exports
 #==============================================================================#
 
@@ -643,3 +1255,14 @@ export glrlm_num_runs, glrlm_num_voxels, get_merged_glrlm
 
 # Export direction constants
 export GLRLM_DIRECTIONS_3D, GLRLM_DIRECTIONS_2D
+
+# Export GLRLM feature functions
+export glrlm_short_run_emphasis, glrlm_long_run_emphasis
+export glrlm_gray_level_non_uniformity, glrlm_gray_level_non_uniformity_normalized
+export glrlm_run_length_non_uniformity, glrlm_run_length_non_uniformity_normalized
+export glrlm_run_percentage
+export glrlm_gray_level_variance, glrlm_run_variance
+export glrlm_run_entropy
+export glrlm_low_gray_level_run_emphasis, glrlm_high_gray_level_run_emphasis
+export glrlm_short_run_low_gray_level_emphasis, glrlm_short_run_high_gray_level_emphasis
+export glrlm_long_run_low_gray_level_emphasis, glrlm_long_run_high_gray_level_emphasis

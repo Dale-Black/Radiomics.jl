@@ -54,9 +54,11 @@ include("firstorder.jl")
 # Shape features (2D and 3D)
 include("shape.jl")
 
+# Gray Level Co-occurrence Matrix (GLCM) features
+include("glcm.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("glcm.jl")
 # include("glrlm.jl")
 # include("glszm.jl")
 # include("ngtdm.jl")
@@ -138,5 +140,12 @@ export major_axis_length_3d, minor_axis_length_3d, least_axis_length
 export elongation_3d, flatness
 export extract_shape_3d, extract_shape_3d_to_featureset!
 export shape_3d_feature_names, shape_3d_ibsi_features
+
+# Export GLCM computation functions and types
+export GLCMResult, GLCMResult2D
+export compute_glcm, compute_glcm_2d
+export GLCM_DIRECTIONS_3D, GLCM_DIRECTIONS_2D
+export get_averaged_glcm, get_merged_glcm
+export glcm_num_gray_levels, glcm_num_directions
 
 end # module Radiomics

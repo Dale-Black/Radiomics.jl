@@ -366,7 +366,7 @@
       "title": "Research First Order Features in Detail",
       "description": "Document exact implementation details of all first-order features",
       "priority": 15,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "List all first-order features in PyRadiomics",
         "Document exact formula for each feature",

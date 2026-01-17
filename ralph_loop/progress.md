@@ -3856,3 +3856,638 @@ These differences are documented in the test file and do not affect feature calc
 - numpy.digitize behavior documentation
 - PythonCall.jl for Julia-Python interop
 
+
+### Iteration 15 - 2026-01-17 13:30:18
+
+**Story**: RESEARCH-FIRSTORDER-DETAILS
+**Status**: ✅ COMPLETED
+
+### Objective
+
+Document exact implementation details of all first-order features from PyRadiomics, including formulas, edge cases, and Julia implementation notes.
+
+---
+
+## First Order Features - Detailed Research
+
+**Source File**: `radiomics/firstorder.py` (PyRadiomics)
+**Documentation**: https://pyradiomics.readthedocs.io/en/latest/features.html
+**IBSI Reference**: https://ibsi.readthedocs.io/en/latest/03_Image_features.html
+
+First-order features are statistical features computed directly from voxel intensities within the ROI, without considering spatial relationships between voxels.
+
+### Feature Count: 19 Features
+
+| # | Feature Name | IBSI ID | Volume-Confounded | IBSI Compliant |
+|---|--------------|---------|-------------------|----------------|
+| 1 | Energy | N8CA | Yes | Yes |
+| 2 | TotalEnergy | N/A | Yes | No (extension) |
+| 3 | Entropy | TLU2 | No | Yes |
+| 4 | Minimum | 1GSF | No | Yes |
+| 5 | 10Percentile | QG58 | No | Yes |
+| 6 | 90Percentile | 8DWT | No | Yes |
+| 7 | Maximum | 84IY | No | Yes |
+| 8 | Mean | Q4LE | No | Yes |
+| 9 | Median | Y12H | No | Yes |
+| 10 | InterquartileRange | SALO | No | Yes |
+| 11 | Range | 2OJQ | No | Yes |
+| 12 | MeanAbsoluteDeviation | 4FUA | No | Yes |
+| 13 | RobustMeanAbsoluteDeviation | 1128 | No | Yes |
+| 14 | RootMeanSquared | 5ZWQ | Yes | Yes |
+| 15 | StandardDeviation | N/A | No | No (deprecated) |
+| 16 | Skewness | KE2A | No | Yes |
+| 17 | Kurtosis | IPH6 | No | Partial* |
+| 18 | Variance | ECT3 | No | Yes |
+| 19 | Uniformity | BJ5W | No | Yes |
+
+*Note: PyRadiomics Kurtosis does NOT subtract 3 (not excess kurtosis), while IBSI expects excess kurtosis. The PyRadiomics value is 3 higher than IBSI.
+
+---
+
+### Detailed Feature Specifications
+
+#### 1. Energy (N8CA)
+**PyRadiomics Method**: `getEnergyFeatureValue()`
+**File/Line**: radiomics/firstorder.py
+
+**Formula**:
+```
+Energy = Σᵢ₌₁ᴺᵖ (X(i) + c)²
+```
+Where:
+- X(i) = voxel intensity at index i
+- Nₚ = number of voxels in ROI
+- c = voxelArrayShift (for handling negative values, default = 0)
+
+**NumPy Functions Used**:
+- `np.nansum()` for summing squared values
+
+**Edge Cases**:
+- Handles negative values via optional voxelArrayShift parameter
+- Volume-confounded: larger ROIs produce larger Energy values
+
+**Julia Implementation**:
+```julia
+function energy(voxels::AbstractVector{<:Real}; shift::Real=0)
+    return sum(v -> (v + shift)^2, voxels)
+end
+```
+
+---
+
+#### 2. Total Energy (NOT IN IBSI)
+**PyRadiomics Method**: `getTotalEnergyFeatureValue()`
+
+**Formula**:
+```
+TotalEnergy = Vvoxel × Σᵢ₌₁ᴺᵖ (X(i) + c)²
+```
+Where:
+- Vvoxel = voxel volume in cubic mm (pixelWidth × pixelHeight × sliceThickness)
+
+**NumPy Functions Used**:
+- `np.multiply.reduce()` for computing voxel volume
+- Calls `getEnergyFeatureValue()` internally
+
+**Edge Cases**:
+- Requires voxel spacing information
+- Volume-confounded
+
+**Julia Implementation**:
+```julia
+function total_energy(voxels::AbstractVector{<:Real}, voxel_volume::Real; shift::Real=0)
+    return voxel_volume * energy(voxels; shift=shift)
+end
+```
+
+---
+
+#### 3. Entropy (TLU2)
+**PyRadiomics Method**: `getEntropyFeatureValue()`
+
+**Formula**:
+```
+Entropy = -Σᵢ₌₁ᴺᵍ p(i) × log₂(p(i) + ε)
+```
+Where:
+- Nᵧ = number of discrete gray levels
+- p(i) = probability of gray level i (normalized histogram)
+- ε = np.spacing(1) ≈ 2.2 × 10⁻¹⁶ (machine epsilon)
+
+**NumPy Functions Used**:
+- `np.unique(..., return_counts=True)` for histogram
+- `np.log2()` for logarithm
+- `np.spacing(1)` for epsilon
+
+**Edge Cases**:
+- ε prevents log(0) errors
+- Uses DISCRETIZED image values, not raw voxels
+- Histogram computed via np.unique on discretized values
+
+**IMPORTANT**: This feature requires discretized image values, NOT raw intensities.
+
+**Julia Implementation**:
+```julia
+function entropy(voxels::AbstractVector{<:Real})
+    # Count unique values and compute probabilities
+    counts = StatsBase.countmap(voxels)
+    n = length(voxels)
+    probs = [c / n for c in values(counts)]
+
+    eps = eps(Float64)  # Machine epsilon
+    return -sum(p -> p * log2(p + eps), probs)
+end
+```
+
+---
+
+#### 4. Minimum (1GSF)
+**PyRadiomics Method**: `getMinimumFeatureValue()`
+
+**Formula**:
+```
+Minimum = min(X)
+```
+
+**NumPy Functions Used**:
+- `np.nanmin()` - handles NaN values
+
+**Julia Implementation**:
+```julia
+minimum(voxels) = Base.minimum(filter(!isnan, voxels))
+```
+
+---
+
+#### 5. 10th Percentile (QG58)
+**PyRadiomics Method**: `get10PercentileFeatureValue()`
+
+**Formula**:
+```
+P₁₀ = 10th percentile of X
+```
+
+**NumPy Functions Used**:
+- `np.nanpercentile(targetVoxelArray, 10)`
+
+**Note**: Uses numpy's linear interpolation method for percentiles.
+
+**Julia Implementation**:
+```julia
+function percentile_10(voxels::AbstractVector{<:Real})
+    return quantile(filter(!isnan, voxels), 0.10)
+end
+```
+
+---
+
+#### 6. 90th Percentile (8DWT)
+**PyRadiomics Method**: `get90PercentileFeatureValue()`
+
+**Formula**:
+```
+P₉₀ = 90th percentile of X
+```
+
+**NumPy Functions Used**:
+- `np.nanpercentile(targetVoxelArray, 90)`
+
+**Julia Implementation**:
+```julia
+function percentile_90(voxels::AbstractVector{<:Real})
+    return quantile(filter(!isnan, voxels), 0.90)
+end
+```
+
+---
+
+#### 7. Maximum (84IY)
+**PyRadiomics Method**: `getMaximumFeatureValue()`
+
+**Formula**:
+```
+Maximum = max(X)
+```
+
+**NumPy Functions Used**:
+- `np.nanmax()` - handles NaN values
+
+**Julia Implementation**:
+```julia
+maximum(voxels) = Base.maximum(filter(!isnan, voxels))
+```
+
+---
+
+#### 8. Mean (Q4LE)
+**PyRadiomics Method**: `getMeanFeatureValue()`
+
+**Formula**:
+```
+Mean = (1/Nₚ) × Σᵢ₌₁ᴺᵖ X(i)
+```
+
+**NumPy Functions Used**:
+- `np.nanmean()` - handles NaN values
+
+**Julia Implementation**:
+```julia
+using Statistics
+mean(voxels) = Statistics.mean(filter(!isnan, voxels))
+```
+
+---
+
+#### 9. Median (Y12H)
+**PyRadiomics Method**: `getMedianFeatureValue()`
+
+**Formula**:
+```
+Median = middle value of sorted X
+```
+
+**NumPy Functions Used**:
+- `np.nanmedian()` - handles NaN values
+
+**Julia Implementation**:
+```julia
+using Statistics
+median(voxels) = Statistics.median(filter(!isnan, voxels))
+```
+
+---
+
+#### 10. Interquartile Range (SALO)
+**PyRadiomics Method**: `getInterquartileRangeFeatureValue()`
+
+**Formula**:
+```
+IQR = P₇₅ - P₂₅
+```
+
+**NumPy Functions Used**:
+- `np.nanpercentile(targetVoxelArray, [75, 25])`
+
+**Julia Implementation**:
+```julia
+function interquartile_range(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    return quantile(clean, 0.75) - quantile(clean, 0.25)
+end
+```
+
+---
+
+#### 11. Range (2OJQ)
+**PyRadiomics Method**: `getRangeFeatureValue()`
+
+**Formula**:
+```
+Range = max(X) - min(X)
+```
+
+**NumPy Functions Used**:
+- `np.nanmax()`, `np.nanmin()`
+
+**Julia Implementation**:
+```julia
+function range(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    return Base.maximum(clean) - Base.minimum(clean)
+end
+```
+
+---
+
+#### 12. Mean Absolute Deviation (4FUA)
+**PyRadiomics Method**: `getMeanAbsoluteDeviationFeatureValue()`
+
+**Formula**:
+```
+MAD = (1/Nₚ) × Σᵢ₌₁ᴺᵖ |X(i) - X̄|
+```
+Where X̄ = mean of X
+
+**NumPy Functions Used**:
+- `np.nanmean()` for mean
+- `np.absolute()` for absolute value
+
+**Julia Implementation**:
+```julia
+function mean_absolute_deviation(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    μ = mean(clean)
+    return mean(abs.(clean .- μ))
+end
+```
+
+---
+
+#### 13. Robust Mean Absolute Deviation (1128)
+**PyRadiomics Method**: `getRobustMeanAbsoluteDeviationFeatureValue()`
+
+**Formula**:
+```
+rMAD = (1/N₁₀₋₉₀) × Σᵢ₌₁ᴺ¹⁰⁻⁹⁰ |X₁₀₋₉₀(i) - X̄₁₀₋₉₀|
+```
+Where X₁₀₋₉₀ are values between 10th and 90th percentiles
+
+**NumPy Functions Used**:
+- `np.isnan()` for NaN masking
+- `np.nanpercentile()` for percentile thresholds
+- Boolean indexing for filtering
+
+**Edge Cases**:
+- First filters out NaN values
+- Then filters to 10th-90th percentile range
+- Calculates MAD on remaining values
+
+**Julia Implementation**:
+```julia
+function robust_mean_absolute_deviation(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    p10, p90 = quantile(clean, [0.10, 0.90])
+    robust = filter(v -> p10 <= v <= p90, clean)
+    μ = mean(robust)
+    return mean(abs.(robust .- μ))
+end
+```
+
+---
+
+#### 14. Root Mean Squared (5ZWQ)
+**PyRadiomics Method**: `getRootMeanSquaredFeatureValue()`
+
+**Formula**:
+```
+RMS = √[(1/Nₚ) × Σᵢ₌₁ᴺᵖ (X(i) + c)²]
+```
+
+**NumPy Functions Used**:
+- `np.nansum()` for sum of squares
+- `np.sum()` for count (via mask)
+- `np.sqrt()` for square root
+
+**Edge Cases**:
+- Returns 0 if Nₚ = 0 (no voxels in ROI)
+- Uses voxelArrayShift (c) for negative value handling
+
+**Julia Implementation**:
+```julia
+function root_mean_squared(voxels::AbstractVector{<:Real}; shift::Real=0)
+    n = count(!isnan, voxels)
+    n == 0 && return 0.0
+    return sqrt(sum(v -> (v + shift)^2, filter(!isnan, voxels)) / n)
+end
+```
+
+---
+
+#### 15. Standard Deviation (DEPRECATED)
+**PyRadiomics Method**: `getStandardDeviationFeatureValue()`
+
+**Formula**:
+```
+σ = √[(1/Nₚ) × Σᵢ₌₁ᴺᵖ (X(i) - X̄)²]
+```
+
+**NumPy Functions Used**:
+- `np.nanstd()` with ddof=0 (population std)
+
+**Note**: This feature is DEPRECATED in PyRadiomics because it's just √Variance.
+Disabled by default unless explicitly requested.
+
+**Julia Implementation**:
+```julia
+function standard_deviation(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    return std(clean; corrected=false)  # Population std, not sample std
+end
+```
+
+---
+
+#### 16. Skewness (KE2A)
+**PyRadiomics Method**: `getSkewnessFeatureValue()`
+
+**Formula**:
+```
+Skewness = μ₃ / σ³ = μ₃ / (σ²)^(3/2)
+```
+Where:
+- μ₃ = (1/Nₚ) × Σᵢ₌₁ᴺᵖ (X(i) - X̄)³ (third central moment)
+- σ² = variance
+
+**NumPy Functions Used**:
+- Internal `_moment(a, moment=3)` method
+- `np.nanmean()` for mean
+- `np.power()` for exponentiation
+
+**Edge Cases**:
+- Returns 0 if σ = 0 (flat region with no variance)
+- Prevents division by zero
+
+**Julia Implementation**:
+```julia
+function skewness(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    n = length(clean)
+    μ = mean(clean)
+    σ² = sum((clean .- μ).^2) / n
+    σ² == 0 && return 0.0  # Flat region
+    μ₃ = sum((clean .- μ).^3) / n
+    return μ₃ / (σ²)^1.5
+end
+```
+
+---
+
+#### 17. Kurtosis (IPH6)
+**PyRadiomics Method**: `getKurtosisFeatureValue()`
+
+**Formula (PyRadiomics)**:
+```
+Kurtosis = μ₄ / σ⁴ = μ₄ / (σ²)²
+```
+
+**IMPORTANT: IBSI vs PyRadiomics Difference**:
+- IBSI defines EXCESS kurtosis: μ₄/σ⁴ - 3
+- PyRadiomics returns REGULAR kurtosis: μ₄/σ⁴
+- PyRadiomics value is 3 HIGHER than IBSI value
+- Normal distribution: IBSI=0, PyRadiomics=3
+
+**NumPy Functions Used**:
+- Internal `_moment(a, moment=4)` method
+- `np.nanmean()` for mean
+
+**Edge Cases**:
+- Returns 0 if σ = 0 (flat region with no variance)
+- Prevents division by zero
+
+**Julia Implementation (matching PyRadiomics, NOT IBSI)**:
+```julia
+function kurtosis(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    n = length(clean)
+    μ = mean(clean)
+    σ² = sum((clean .- μ).^2) / n
+    σ² == 0 && return 0.0  # Flat region
+    μ₄ = sum((clean .- μ).^4) / n
+    return μ₄ / σ²^2  # NOT excess kurtosis (no -3)
+end
+```
+
+---
+
+#### 18. Variance (ECT3)
+**PyRadiomics Method**: `getVarianceFeatureValue()`
+
+**Formula**:
+```
+Variance = (1/Nₚ) × Σᵢ₌₁ᴺᵖ (X(i) - X̄)²
+```
+
+**NumPy Functions Used**:
+- `np.nanstd()` squared (or np.nanvar())
+- Uses ddof=0 (population variance, not sample variance)
+
+**Julia Implementation**:
+```julia
+function variance(voxels::AbstractVector{<:Real})
+    clean = filter(!isnan, voxels)
+    return var(clean; corrected=false)  # Population variance
+end
+```
+
+---
+
+#### 19. Uniformity (BJ5W)
+**PyRadiomics Method**: `getUniformityFeatureValue()`
+
+**Formula**:
+```
+Uniformity = Σᵢ₌₁ᴺᵍ p(i)²
+```
+Where p(i) = probability of gray level i in discretized histogram
+
+**NumPy Functions Used**:
+- `np.nansum()` for summing squared probabilities
+- Uses pre-computed histogram from `_initCalculation()`
+
+**IMPORTANT**: Like Entropy, this uses DISCRETIZED values.
+
+**Julia Implementation**:
+```julia
+function uniformity(voxels::AbstractVector{<:Real})
+    counts = StatsBase.countmap(voxels)
+    n = length(voxels)
+    probs = [c / n for c in values(counts)]
+    return sum(p -> p^2, probs)
+end
+```
+
+---
+
+### Critical Implementation Notes
+
+#### 1. Histogram-Based vs Voxel-Based Features
+
+**Voxel-Based Features** (use raw intensity values):
+- Energy, TotalEnergy, RootMeanSquared
+- Minimum, Maximum, Mean, Median, Range
+- All percentiles (10th, 90th, IQR)
+- MeanAbsoluteDeviation, RobustMeanAbsoluteDeviation
+- StandardDeviation, Skewness, Kurtosis, Variance
+
+**Histogram-Based Features** (use discretized intensity histogram):
+- Entropy
+- Uniformity
+
+#### 2. voxelArrayShift Parameter
+
+For Energy, TotalEnergy, and RootMeanSquared, PyRadiomics adds a shift value `c` to handle negative intensities (common in CT). This shifts all values to be positive before squaring.
+
+Default: c = 0
+For CT: Often c = 2000 (shift HU values to positive range)
+
+#### 3. Population vs Sample Statistics
+
+PyRadiomics uses **population** statistics (ddof=0), NOT sample statistics (ddof=1):
+- Variance: 1/N × Σ(X-μ)² (not 1/(N-1))
+- Standard Deviation: √(population variance)
+
+In Julia, use `corrected=false` for `var()` and `std()`.
+
+#### 4. NaN Handling
+
+PyRadiomics uses `np.nan*` functions throughout to handle NaN values gracefully. In Julia, we should:
+- Filter out NaN values using `filter(!isnan, voxels)`
+- Or use Statistics functions that handle NaN
+
+#### 5. _moment() Internal Method
+
+PyRadiomics uses this static method for central moments:
+```python
+@staticmethod
+def _moment(a, moment=1):
+    if moment == 1:
+        return 0.0
+    mn = np.nanmean(a, 1, keepdims=True)  # 2D array support
+    s = np.power((a - mn), moment)
+    return np.nanmean(s, 1)
+```
+
+The `axis=1` is for kernel-based mode (multiple neighborhoods). For standard mode, arrays are 1D.
+
+---
+
+### NumPy/SciPy to Julia Mapping
+
+| NumPy/SciPy | Julia Equivalent |
+|-------------|------------------|
+| `np.nansum()` | `sum(filter(!isnan, x))` |
+| `np.nanmean()` | `mean(filter(!isnan, x))` |
+| `np.nanstd(ddof=0)` | `std(x; corrected=false)` |
+| `np.nanvar(ddof=0)` | `var(x; corrected=false)` |
+| `np.nanmedian()` | `median(filter(!isnan, x))` |
+| `np.nanmin()` | `minimum(filter(!isnan, x))` |
+| `np.nanmax()` | `maximum(filter(!isnan, x))` |
+| `np.nanpercentile(x, p)` | `quantile(filter(!isnan, x), p/100)` |
+| `np.log2()` | `log2()` |
+| `np.spacing(1)` | `eps(Float64)` |
+| `np.unique(return_counts=True)` | `StatsBase.countmap()` |
+| `np.absolute()` | `abs.()` |
+
+---
+
+### Implementation Checklist for Julia
+
+- [ ] energy(voxels; shift=0) → Float64
+- [ ] total_energy(voxels, voxel_volume; shift=0) → Float64
+- [ ] entropy(discretized_voxels) → Float64 [histogram-based]
+- [ ] minimum_intensity(voxels) → Float64
+- [ ] percentile_10(voxels) → Float64
+- [ ] percentile_90(voxels) → Float64
+- [ ] maximum_intensity(voxels) → Float64
+- [ ] mean_intensity(voxels) → Float64
+- [ ] median_intensity(voxels) → Float64
+- [ ] interquartile_range(voxels) → Float64
+- [ ] intensity_range(voxels) → Float64
+- [ ] mean_absolute_deviation(voxels) → Float64
+- [ ] robust_mean_absolute_deviation(voxels) → Float64
+- [ ] root_mean_squared(voxels; shift=0) → Float64
+- [ ] standard_deviation(voxels) → Float64 [deprecated]
+- [ ] skewness(voxels) → Float64
+- [ ] kurtosis(voxels) → Float64 [NOT excess kurtosis]
+- [ ] variance(voxels) → Float64
+- [ ] uniformity(discretized_voxels) → Float64 [histogram-based]
+
+---
+
+### References
+
+1. PyRadiomics Source: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/firstorder.py
+2. PyRadiomics Docs: https://pyradiomics.readthedocs.io/en/latest/features.html
+3. IBSI Documentation: https://ibsi.readthedocs.io/en/latest/03_Image_features.html
+4. IBSI Reference Manual: https://arxiv.org/pdf/1612.07003
+

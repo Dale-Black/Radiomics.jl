@@ -456,7 +456,7 @@
       "title": "Implement 2D Shape Features",
       "description": "Implement all 2D shape features",
       "priority": 19,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/shape.jl module",
         "Implement MeshSurfaceArea (2D perimeter)",

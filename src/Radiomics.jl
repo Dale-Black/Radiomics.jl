@@ -49,9 +49,11 @@ include("discretization.jl")
 # First-order statistical features
 include("firstorder.jl")
 
+# Shape features (2D and 3D)
+include("shape.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("shape.jl")
 # include("glcm.jl")
 # include("glrlm.jl")
 # include("glszm.jl")
@@ -118,5 +120,12 @@ export interquartile_range, mean_absolute_deviation, robust_mean_absolute_deviat
 export root_mean_squared, standard_deviation, skewness, kurtosis, uniformity
 export extract_firstorder, extract_firstorder_to_featureset!
 export firstorder_feature_names, firstorder_ibsi_features
+
+# Export 2D shape feature functions
+export perimeter_2d, mesh_surface_2d, pixel_surface_2d
+export perimeter_surface_ratio_2d, sphericity_2d, spherical_disproportion_2d
+export maximum_diameter_2d, major_axis_length_2d, minor_axis_length_2d, elongation_2d
+export extract_shape_2d, extract_shape_2d_to_featureset!
+export shape_2d_feature_names, shape_2d_ibsi_features
 
 end # module Radiomics

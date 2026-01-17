@@ -5013,3 +5013,76 @@ CondaPkg = "..."
 
 ---
 
+
+### Iteration 19 - 2026-01-17 13:57:50
+
+**Agent started** (Open: 30, Done: 18)
+
+
+### Iteration 20 - 2026-01-17
+
+**Story**: IMPL-SHAPE-2D
+**Status**: ✅ COMPLETED
+
+---
+
+## 2D Shape Features Implementation
+
+### Summary
+
+Implemented all 10 2D shape features in `src/shape.jl` following PyRadiomics conventions.
+
+### Features Implemented
+
+| # | Feature | Function | Formula | Notes |
+|---|---------|----------|---------|-------|
+| 1 | Mesh Surface | `mesh_surface_2d()` | ½\|Σ(xᵢyⱼ - xⱼyᵢ)\| | Area from marching squares mesh |
+| 2 | Pixel Surface | `pixel_surface_2d()` | Nₚ × Aₚᵢₓₑₗ | Area from pixel count |
+| 3 | Perimeter | `perimeter_2d()` | Σ√[(Δx)² + (Δy)²] | Sum of contour line segments |
+| 4 | Perimeter-Surface Ratio | `perimeter_surface_ratio_2d()` | P/A | Not dimensionless (mm⁻¹) |
+| 5 | Sphericity | `sphericity_2d()` | (2√(πA))/P | Circularity, range (0,1] |
+| 6 | Spherical Disproportion | `spherical_disproportion_2d()` | 1/Sphericity | **Deprecated** |
+| 7 | Maximum Diameter | `maximum_diameter_2d()` | max(\|\|Vᵢ-Vⱼ\|\|) | 2D Feret diameter |
+| 8 | Major Axis Length | `major_axis_length_2d()` | 4√λ_major | PCA-based |
+| 9 | Minor Axis Length | `minor_axis_length_2d()` | 4√λ_minor | PCA-based |
+| 10 | Elongation | `elongation_2d()` | √(λ_minor/λ_major) | Range [0,1], 1=circular |
+
+### Key Implementation Details
+
+#### Marching Squares Algorithm
+- Implemented `_marching_squares_2d()` function for contour extraction
+- Uses 16-entry lookup table for cell configurations
+- Handles ambiguous cases (configurations 5 and 10) with two line segments
+- Vertices placed at edge midpoints, scaled by pixel spacing
+
+#### PCA for Axis Lengths
+- Implemented `_compute_eigenvalues_2d()` for eigenvalue computation
+- Physical coordinates centered at mean and normalized by √N
+- Covariance matrix computed as X'X
+- Eigenvalues sorted ascending: [λ_minor, λ_major]
+- Handles small negative eigenvalues from numerical precision
+
+#### High-Level API
+- `extract_shape_2d(mask, spacing)` returns Dict of all features
+- `extract_shape_2d_to_featureset!()` for FeatureSet integration
+- `shape_2d_feature_names()` and `shape_2d_ibsi_features()` for feature lists
+
+### Files Modified
+- Created: `src/shape.jl` (new file with all 2D shape features)
+- Modified: `src/Radiomics.jl` (added include and exports)
+
+### Test Results
+```julia
+# 5×5 square test:
+PixelSurface: 25.0  # Correct
+Perimeter: 18.83    # Expected (marching squares approximation)
+Elongation: 1.0     # Correct (square is isotropic)
+Sphericity: 0.94    # Expected (square is not a circle)
+```
+
+### Notes
+- SphericalDisproportion included for PyRadiomics compatibility but marked deprecated
+- Mesh-based area differs from pixel counting for smooth shapes
+- Ready for TEST-SHAPE-PARITY verification against PyRadiomics
+
+---

@@ -232,7 +232,7 @@
       "title": "Set Up GitHub Actions CI",
       "description": "Configure continuous integration for automated testing",
       "priority": 8,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create .github/workflows/CI.yml",
         "Configure Julia version matrix (1.10, 1.11)",

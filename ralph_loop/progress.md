@@ -3250,3 +3250,56 @@ Initialized git repository for Radiomics.jl with proper configuration:
 
 ---
 
+
+### Iteration 8 - 2026-01-17 12:33:00
+
+**Agent started** (Open: 41, Done: 7)
+
+
+
+### Iteration 9 - 2026-01-17
+
+**Story**: SETUP-CI
+**Status**: ✅ COMPLETED
+
+### Accomplishments
+
+Created GitHub Actions CI workflow for Radiomics.jl:
+
+1. **Created .github/workflows/CI.yml** with:
+   - Julia version matrix: 1.10 and 1.11
+   - OS matrix: ubuntu-latest and macos-latest
+   - Python 3.11 setup for CondaPkg/PythonCall test dependencies
+   - Concurrency control to cancel redundant PR builds
+   - Coverage processing and Codecov upload on Julia 1.11/Ubuntu
+   - Documentation job (set to continue-on-error until docs are fully set up)
+
+2. **CI Workflow Features**:
+   - Triggers on push to main, tags, and pull requests
+   - Uses julia-actions for setup, caching, build, and test
+   - Sets up Python 3.11 for pyradiomics dependencies via CondaPkg
+   - JULIA_NUM_THREADS=2 for parallel test execution
+   - Codecov integration for coverage reporting
+
+3. **Added CI badge to README.md**:
+   - Badge links to GitHub Actions workflow status
+
+### Files Created/Modified
+
+```
+.github/
+└── workflows/
+    └── CI.yml          # GitHub Actions CI workflow
+
+README.md               # Added CI badge
+ralph_loop/prd.json     # Updated SETUP-CI status to done
+```
+
+### Verification
+
+- CI workflow file created at .github/workflows/CI.yml
+- README.md includes CI badge
+- prd.json SETUP-CI status updated to "done"
+
+---
+

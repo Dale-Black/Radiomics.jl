@@ -1,5 +1,7 @@
 # Radiomics.jl
 
+[![CI](https://github.com/daleblack/Radiomics.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/daleblack/Radiomics.jl/actions/workflows/CI.yml)
+
 A pure Julia implementation of [PyRadiomics](https://github.com/AIM-Harvard/pyradiomics) for extracting radiomic features from medical images.
 
 ## Status

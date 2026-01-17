@@ -642,7 +642,7 @@
       "title": "Implement GLRLM Matrix Computation",
       "description": "Implement Gray Level Run Length Matrix computation",
       "priority": 27,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/glrlm.jl module",
         "Implement run length detection algorithm",

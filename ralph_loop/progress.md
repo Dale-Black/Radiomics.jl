@@ -6189,3 +6189,94 @@ emptyRunLengths = numpy.where(pr_sum == 0)[0]
 
 ---
 
+
+### Iteration 28 - 2026-01-17 15:42:22
+
+**Agent started** (Open: 22, Done: 26)
+
+
+
+### Iteration 29 - 2026-01-17
+
+**Story**: IMPL-GLRLM-MATRIX
+**Status**: ✅ COMPLETED
+
+### Accomplishments
+
+Implemented Gray Level Run Length Matrix (GLRLM) computation for texture analysis:
+
+1. **Created src/glrlm.jl module** with:
+   - Constants: `GLRLM_DIRECTIONS_3D` (13 directions) and `GLRLM_DIRECTIONS_2D` (4 directions)
+   - Result types: `GLRLMResult` and `GLRLMResult2D`
+   - Core computation functions
+   - Utility functions
+
+2. **Run Detection Algorithm**:
+   - `_detect_runs_3d()`: Scans 3D image along each direction
+   - `_detect_runs_2d()`: Scans 2D image along each direction
+   - Tracks visited voxels to avoid double counting
+   - Identifies run starting points (voxels where previous voxel differs)
+   - Extends runs until gray level changes or mask boundary
+
+3. **Matrix Computation**:
+   - `compute_glrlm()`: Main function for 3D images
+   - `compute_glrlm_2d()`: For 2D images
+   - Support for both discretized (integer) and raw (float) images
+   - Automatic discretization via existing `discretize_image()` function
+   - Settings-based interface: `compute_glrlm(image, mask, settings)`
+
+4. **Key Implementation Details**:
+   - GLRLM matrix P[i,j] counts runs with gray level i and length j
+   - Ns = total number of runs per direction
+   - Np = total number of voxels per direction (should equal mask count)
+   - Nr = maximum possible run length (max dimension)
+   - Matrices are NOT normalized (raw counts) - features normalize internally
+
+5. **Utility Functions**:
+   - `glrlm_num_gray_levels()`: Get Ng
+   - `glrlm_num_directions()`: Get number of directions
+   - `glrlm_max_run_length()`: Get Nr
+   - `glrlm_num_runs()`: Get Ns for a direction
+   - `glrlm_num_voxels()`: Get Np for a direction
+   - `get_merged_glrlm()`: Sum matrices across directions
+   - `_glrlm_marginals()`: Compute pg and pr marginal distributions
+
+6. **Updated src/Radiomics.jl**:
+   - Added `include("glrlm.jl")`
+   - Added all GLRLM exports
+
+### Verification
+
+- Package loads successfully with GLRLM module
+- 3D GLRLM computed correctly with 13 directions
+- 2D GLRLM computed correctly with 4 directions
+- Partial mask (spherical ROI) handled correctly
+- Voxel counts (Np) match expected mask count
+
+### Files Created/Modified
+
+```
+src/
+├── glrlm.jl            # NEW - GLRLM implementation (~500 lines)
+└── Radiomics.jl        # Updated - added GLRLM include and exports
+```
+
+### Git Commit
+
+```
+3f51292 IMPL-GLRLM-MATRIX: Implement GLRLM matrix computation
+```
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create src/glrlm.jl module | ✅ |
+| Implement run length detection algorithm | ✅ |
+| Implement GLRLM matrix computation | ✅ |
+| Support all 13 directions in 3D | ✅ |
+| Handle masked regions correctly | ✅ |
+| Commit with descriptive message | ✅ |
+
+---
+

@@ -328,7 +328,7 @@
       "title": "Implement Gray Level Discretization",
       "description": "Implement binning/discretization for texture matrices",
       "priority": 13,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement fixed_bin_width discretization",
         "Implement fixed_bin_count discretization",

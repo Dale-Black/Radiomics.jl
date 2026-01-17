@@ -43,9 +43,11 @@ include("image_handling.jl")
 # Mask operations
 include("mask_operations.jl")
 
+# Gray level discretization
+include("discretization.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("discretization.jl")
 # include("firstorder.jl")
 # include("shape.jl")
 # include("glcm.jl")
@@ -100,5 +102,10 @@ export mask_extent, mask_dimensionality
 export dilate_mask, erode_mask, fill_holes_2d
 export largest_connected_component
 export mask_surface_voxels, mask_interior_voxels
+
+# Export discretization functions
+export get_bin_edges, discretize, discretize_image, discretize_voxels
+export get_discretization_range, suggest_bincount, suggest_binwidth
+export count_gray_levels, gray_level_histogram
 
 end # module Radiomics

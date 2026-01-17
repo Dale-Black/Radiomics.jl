@@ -3675,3 +3675,97 @@ All functions tested successfully:
 
 - PyRadiomics imageoperations.py: checkMask(), cropToTumorMask(), _checkROI()
 - PyRadiomics uses SimpleITK's LabelStatisticsImageFilter for bounding box
+
+### Iteration 13 - 2026-01-17 13:10:58
+
+**Agent started** (Open: 36, Done: 12)
+
+
+---
+
+## Iteration 14: IMPL-DISCRETIZATION
+
+**Date**: 2026-01-17
+**Story**: IMPL-DISCRETIZATION - Implement Gray Level Discretization
+**Status**: COMPLETED
+
+### Summary
+
+Implemented comprehensive gray level discretization (binning) module for reducing the number of gray levels before computing texture features. This is critical for texture matrix computation (GLCM, GLRLM, GLSZM, etc.) and must match PyRadiomics behavior exactly.
+
+### Functions Implemented
+
+#### Core Discretization
+- `get_bin_edges(values; binwidth, bincount)` - Compute histogram bin edges
+  - Fixed Bin Width mode (default): Bins aligned to zero with specified width
+  - Fixed Bin Count mode: Equal-width bins spanning the data range
+- `discretize(values, edges)` - Convert values to integer bin indices
+- `_get_bin_edges_fixed_width(minval, maxval, binwidth)` - Internal FBW implementation
+- `_get_bin_edges_fixed_count(minval, maxval, bincount)` - Internal FBC implementation
+
+#### High-Level Functions
+- `discretize_image(image, mask; binwidth, bincount, label)` - Discretize image within ROI
+  - Returns NamedTuple with discretized image, edges, nbins, min_val, max_val
+  - Supports Bool, BitArray, Integer arrays, RadiomicsImage, RadiomicsMask
+- `discretize_voxels(voxels; binwidth, bincount)` - Discretize voxel vector directly
+- `discretize_image(image, mask, settings::Settings)` - Settings-based discretization
+
+#### Utility Functions
+- `get_discretization_range(image, mask)` - Get intensity range of ROI
+- `suggest_bincount(image, mask; target_bins)` - Suggest appropriate bin count
+- `suggest_binwidth(image, mask; target_bins)` - Suggest appropriate bin width
+
+#### Histogram Functions
+- `count_gray_levels(discretized_image, mask)` - Count distinct gray levels
+- `gray_level_histogram(discretized_image, mask; nbins)` - Compute gray level histogram
+
+### Implementation Details
+
+#### Fixed Bin Width (PyRadiomics Default)
+Formula: `X_b,i = floor(X_gl,i / W) - floor(min(X_gl) / W) + 1`
+
+- Bins are aligned to zero (multiples of binwidth)
+- Lower bound: `floor(minval / binwidth) * binwidth`
+- Upper bound: `(floor(maxval / binwidth) + 1) * binwidth`
+- Default binwidth: 25.0 (same as PyRadiomics)
+
+#### Fixed Bin Count
+- Creates exactly `bincount` equal-width bins
+- Final edge extended by 1 to include maximum value (PyRadiomics convention)
+- Formula: `floor(N_b × (X - min) / (max - min)) + 1`
+
+#### Edge Cases Handled
+- All identical values: Returns `[value - 0.5, value + 0.5]` (single bin)
+- Empty input: Throws ArgumentError
+- NaN values: Assigned bin 0 (invalid marker)
+- Values outside range: Clamped to 1 or nbins
+
+### Files Created/Modified
+
+- `src/discretization.jl` - NEW: All discretization functions (~400 lines)
+- `src/Radiomics.jl` - Updated: includes discretization.jl, exports 9 functions
+- `ralph_loop/prd.json` - Updated: IMPL-DISCRETIZATION status to "done"
+
+### Verification
+
+All functions tested successfully:
+1. get_bin_edges (Fixed Bin Width) - correct edge alignment
+2. get_bin_edges (Fixed Bin Count) - correct bin count
+3. Edge case: identical values - single bin [49.5, 50.5]
+4. discretize - correct bin assignment
+5. discretize_image - zeros outside ROI, correct bins inside
+6. discretize_voxels - convenience function works
+7. Settings-based discretization - respects DiscretizationMode
+8. get_discretization_range - correct min/max extraction
+9. suggest_binwidth, suggest_bincount - reasonable suggestions
+10. count_gray_levels - correct count
+11. gray_level_histogram - probabilities sum to 1.0
+12. RadiomicsImage/RadiomicsMask support - works correctly
+13. All 15 official tests pass via `Pkg.test()`
+
+### References
+
+- PyRadiomics imageoperations.py: getBinEdges(), binImage()
+- IBSI Section 3.4: Gray level discretisation
+- Research findings in progress.md Section 9 (Discretization Methods)
+

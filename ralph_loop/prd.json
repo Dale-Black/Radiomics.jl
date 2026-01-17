@@ -529,7 +529,7 @@
       "title": "Research GLCM Features in Detail",
       "description": "Document GLCM matrix computation and all features",
       "priority": 22,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Document GLCM matrix definition",
         "Document direction/offset handling (13 or 26 directions)",

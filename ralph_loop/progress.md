@@ -5248,3 +5248,288 @@ Test Summary: | Pass  Total     Time
 Radiomics.jl  |  456    456  1m41.1s
 ```
 
+
+### Iteration 23 - 2026-01-17 15:03:09
+
+**Agent started** (Open: 27, Done: 21)
+
+**Story Completed: RESEARCH-GLCM-DETAILS**
+
+#### Summary
+Comprehensive research on GLCM (Gray Level Co-occurrence Matrix) features, including matrix definition, computation algorithm, all 24 features with formulas, aggregation methods, and implementation details.
+
+---
+
+## GLCM (Gray Level Co-occurrence Matrix) Research
+
+### 1. Matrix Definition
+
+A Gray Level Co-occurrence Matrix (GLCM) of size Ng × Ng describes the second-order joint probability function of an image. The (i,j)th element P(i,j|δ,θ) represents the number of times the combination of levels i and j occur in two voxels that are separated by a distance δ along angle θ.
+
+**Sources:**
+- [PyRadiomics Documentation](https://pyradiomics.readthedocs.io/en/latest/features.html)
+- [PyRadiomics GLCM Source](https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/glcm.py)
+
+### 2. Direction/Offset Handling (13 Directions in 3D)
+
+For δ=1, PyRadiomics uses 13 unique directions in 3D (26-connectivity with 2 neighbors per direction):
+
+| # | Direction (z, y, x) | Description |
+|---|---------------------|-------------|
+| 1 | (0, 0, 1) | X-axis |
+| 2 | (0, 1, 0) | Y-axis |
+| 3 | (1, 0, 0) | Z-axis |
+| 4 | (0, 1, 1) | XY diagonal |
+| 5 | (0, 1, -1) | XY anti-diagonal |
+| 6 | (1, 0, 1) | XZ diagonal |
+| 7 | (1, 0, -1) | XZ anti-diagonal |
+| 8 | (1, 1, 0) | YZ diagonal |
+| 9 | (1, -1, 0) | YZ anti-diagonal |
+| 10 | (1, 1, 1) | Body diagonal 1 |
+| 11 | (1, 1, -1) | Body diagonal 2 |
+| 12 | (1, -1, 1) | Body diagonal 3 |
+| 13 | (-1, 1, 1) or (1, -1, -1) | Body diagonal 4 |
+
+**Note:** The distance δ uses the infinity norm. For δ=2, there are 49 unique angles (98-connectivity).
+
+### 3. Matrix Normalization and Symmetry
+
+**Symmetrical GLCM (default):**
+```python
+P_glcm += numpy.transpose(P_glcm, (0, 2, 1, 3))
+```
+This makes the matrix symmetric: P(i,j) = P(j,i). This corresponds to the original Haralick definition.
+
+**Normalization:**
+```python
+P_glcm /= sum_P_glcm[:, None, None, :]
+```
+Each GLCM is normalized so that the sum equals 1, making P(i,j) a probability distribution.
+
+### 4. Aggregation Methods
+
+**Default (Averaging):**
+- Features calculated separately for each angle
+- Final value = mean across all angles (using `np.nanmean()`)
+
+**Distance Weighting:**
+- When `weightingNorm` is set, matrices are weighted by W = exp(-||d||²)
+- Matrices are summed and normalized before feature calculation
+- Available norms: 'manhattan', 'euclidean', 'infinity'
+
+### 5. Key Variables Used in Formulas
+
+| Variable | Definition |
+|----------|------------|
+| P(i,j) or p_ij | Normalized GLCM element at row i, column j |
+| Ng | Number of gray levels |
+| pₓ(i) or p_i. | Marginal probability of row: Σⱼ P(i,j) |
+| pᵧ(j) or p_.j | Marginal probability of column: Σᵢ P(i,j) |
+| μₓ | Mean of x: Σᵢ i·pₓ(i) |
+| μᵧ | Mean of y: Σⱼ j·pᵧ(j) |
+| σₓ | Std dev of x: √[Σᵢ (i-μₓ)²·pₓ(i)] |
+| σᵧ | Std dev of y: √[Σⱼ (j-μᵧ)²·pᵧ(j)] |
+| pₓ₊ᵧ(k) | Sum distribution: Σ P(i,j) where i+j=k, k∈[2, 2Ng] |
+| pₓ₋ᵧ(k) | Difference distribution: Σ P(i,j) where |i-j|=k, k∈[0, Ng-1] |
+| ε | Machine epsilon (~2.2×10⁻¹⁶) for numerical stability |
+
+### 6. All 24 GLCM Features
+
+#### 6.1 First-Order Statistics on GLCM
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 1 | **Autocorrelation** | Σᵢ Σⱼ P(i,j)·i·j | QWB0 | Texture fineness |
+| 2 | **Joint Average** | μₓ = Σᵢ Σⱼ P(i,j)·i | 60VM | Mean gray level (i) |
+| 3 | **Joint Variance** | Σᵢ Σⱼ (i-μₓ)²·P(i,j) | UR99 | Also "Sum of Squares" |
+| 4 | **Joint Entropy** | -Σᵢ Σⱼ P(i,j)·log₂(P(i,j)+ε) | TU9B | Randomness measure |
+| 5 | **Joint Energy** | Σᵢ Σⱼ P(i,j)² | 8ZQL | Angular Second Moment |
+| 6 | **Maximum Probability** | max{P(i,j)} | GYBY | Joint Maximum |
+
+#### 6.2 Contrast/Variation Features
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 7 | **Contrast** | Σᵢ Σⱼ (i-j)²·P(i,j) | ACUI | Local intensity variation |
+| 8 | **Dissimilarity** | Σᵢ Σⱼ |i-j|·P(i,j) | 8S9J | **Deprecated** in PyRadiomics |
+
+#### 6.3 Cluster Features
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 9 | **Cluster Prominence** | Σᵢ Σⱼ (i+j-μₓ-μᵧ)⁴·P(i,j) | AE86 | Asymmetry measure |
+| 10 | **Cluster Shade** | Σᵢ Σⱼ (i+j-μₓ-μᵧ)³·P(i,j) | 7NFM | Skewness measure |
+| 11 | **Cluster Tendency** | Σᵢ Σⱼ (i+j-μₓ-μᵧ)²·P(i,j) | DG8W | Grouping tendency |
+
+#### 6.4 Difference Features (using pₓ₋ᵧ)
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 12 | **Difference Average** | Σₖ k·pₓ₋ᵧ(k) | TF7R | k=0 to Ng-1 |
+| 13 | **Difference Variance** | Σₖ (k-DA)²·pₓ₋ᵧ(k) | D3YU | DA=Diff Average |
+| 14 | **Difference Entropy** | -Σₖ pₓ₋ᵧ(k)·log₂(pₓ₋ᵧ(k)+ε) | NTRS | Randomness in differences |
+
+#### 6.5 Sum Features (using pₓ₊ᵧ)
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 15 | **Sum Average** | Σₖ k·pₓ₊ᵧ(k) | ZGXS | k=2 to 2Ng |
+| 16 | **Sum Variance** | Σₖ (k-SA)²·pₓ₊ᵧ(k) | OEEB | **Deprecated** (=Cluster Tendency) |
+| 17 | **Sum Entropy** | -Σₖ pₓ₊ᵧ(k)·log₂(pₓ₊ᵧ(k)+ε) | P6QZ | k=2 to 2Ng |
+
+#### 6.6 Homogeneity Features
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 18 | **Inverse Difference (ID)** | Σₖ pₓ₋ᵧ(k)/(1+k) | IB1Z | k=0 to Ng-1 |
+| 19 | **IDN (Normalized)** | Σₖ pₓ₋ᵧ(k)/(1+k/Ng) | NDRX | Normalized by Ng |
+| 20 | **IDM (Inverse Diff Moment)** | Σₖ pₓ₋ᵧ(k)/(1+k²) | WF0Z | Also "Homogeneity" |
+| 21 | **IDMN (Normalized)** | Σₖ pₓ₋ᵧ(k)/(1+k²/Ng²) | 1QCO | Normalized by Ng² |
+| 22 | **Inverse Variance** | Σₖ pₓ₋ᵧ(k)/k² | E8JP | k=1 to Ng-1 (k≠0) |
+
+#### 6.7 Correlation Features
+
+| # | Feature | Formula | IBSI Code | Notes |
+|---|---------|---------|-----------|-------|
+| 23 | **Correlation** | (Σᵢ Σⱼ P(i,j)·i·j - μₓ·μᵧ)/(σₓ·σᵧ) | NI2N | Linear dependency [0,1] |
+| 24 | **IMC1** | (HXY - HXY1)/max(HX, HY) | R8DG | Info correlation 1 |
+| 25 | **IMC2** | √(1 - exp(-2·(HXY2 - HXY))) | JN9H | Info correlation 2 [0,1] |
+| 26 | **MCC** | √(second largest eigenvalue of Q) | QCDE | Maximal Corr Coeff |
+
+**Entropy Definitions for IMC features:**
+- HX = -Σᵢ pₓ(i)·log₂(pₓ(i)+ε)
+- HY = -Σⱼ pᵧ(j)·log₂(pᵧ(j)+ε)
+- HXY = Joint Entropy (defined above)
+- HXY1 = -Σᵢ Σⱼ P(i,j)·log₂(pₓ(i)·pᵧ(j)+ε)
+- HXY2 = -Σᵢ Σⱼ pₓ(i)·pᵧ(j)·log₂(pₓ(i)·pᵧ(j)+ε)
+
+**MCC Q Matrix:**
+Q(i,k) = Σⱼ P(i,j)·P(k,j) / (pₓ(i)·pₓ(k))
+
+### 7. Edge Case Handling
+
+| Situation | Handling |
+|-----------|----------|
+| log(0) | Add ε (~2.2×10⁻¹⁶) before taking log |
+| σ = 0 (flat region) | Correlation returns 1 |
+| HX = HY = 0 | IMC1 returns 0 |
+| HXY > HXY2 | IMC2 returns 0 (would give complex number) |
+| Empty angle | Mark as NaN, excluded from averaging |
+
+### 8. Deprecated Features in PyRadiomics
+
+These features generate `DeprecationWarning` but can still be computed:
+- **Dissimilarity** - Equivalent to Difference Average
+- **Homogeneity 1** - Same as IDM
+- **Homogeneity 2** - Same as ID
+- **Sum Variance** - Equivalent to Cluster Tendency
+
+### 9. Implementation Checklist for Julia
+
+#### 9.1 GLCM Matrix Computation
+- [ ] Implement 13-direction offset generation
+- [ ] Support configurable distance parameter
+- [ ] Implement symmetrical matrix option (default: true)
+- [ ] Implement matrix normalization
+- [ ] Handle masked regions correctly
+
+#### 9.2 Auxiliary Distributions
+- [ ] Compute pₓ (row marginal)
+- [ ] Compute pᵧ (column marginal)
+- [ ] Compute pₓ₊ᵧ (sum distribution)
+- [ ] Compute pₓ₋ᵧ (difference distribution)
+- [ ] Compute μₓ, μᵧ, σₓ, σᵧ
+
+#### 9.3 Feature Functions (24 total)
+- [ ] Autocorrelation
+- [ ] JointAverage
+- [ ] JointVariance (SumSquares)
+- [ ] JointEntropy
+- [ ] JointEnergy (AngularSecondMoment)
+- [ ] MaximumProbability
+- [ ] Contrast
+- [ ] ClusterProminence
+- [ ] ClusterShade
+- [ ] ClusterTendency
+- [ ] DifferenceAverage
+- [ ] DifferenceVariance
+- [ ] DifferenceEntropy
+- [ ] SumAverage
+- [ ] SumEntropy
+- [ ] InverseDifference (ID)
+- [ ] InverseDifferenceNormalized (IDN)
+- [ ] InverseDifferenceMoment (IDM)
+- [ ] InverseDifferenceMomentNormalized (IDMN)
+- [ ] InverseVariance
+- [ ] Correlation
+- [ ] Imc1
+- [ ] Imc2
+- [ ] MCC (MaximalCorrelationCoefficient)
+
+#### 9.4 Aggregation
+- [ ] Default: average features across angles
+- [ ] Optional: distance weighting with configurable norm
+
+### 10. Julia Implementation Notes
+
+```julia
+# Direction offsets for δ=1 (13 unique directions)
+const GLCM_DIRECTIONS_3D = [
+    (0, 0, 1),   # X-axis
+    (0, 1, 0),   # Y-axis
+    (1, 0, 0),   # Z-axis
+    (0, 1, 1),   # XY diagonal
+    (0, 1, -1),  # XY anti-diagonal
+    (1, 0, 1),   # XZ diagonal
+    (1, 0, -1),  # XZ anti-diagonal
+    (1, 1, 0),   # YZ diagonal
+    (1, -1, 0),  # YZ anti-diagonal
+    (1, 1, 1),   # Body diagonal
+    (1, 1, -1),
+    (1, -1, 1),
+    (1, -1, -1),
+]
+
+# GLCM computation pseudocode
+function compute_glcm(image, mask, distance=1; symmetric=true)
+    Ng = number_of_gray_levels(image)
+    glcm = zeros(Ng, Ng, 13)  # One matrix per direction
+
+    for (d, direction) in enumerate(GLCM_DIRECTIONS_3D)
+        for idx in CartesianIndices(mask)
+            if mask[idx]
+                neighbor_idx = idx + CartesianIndex(direction .* distance)
+                if checkbounds(Bool, mask, neighbor_idx) && mask[neighbor_idx]
+                    i = image[idx]
+                    j = image[neighbor_idx]
+                    glcm[i, j, d] += 1
+                end
+            end
+        end
+    end
+
+    if symmetric
+        glcm .+= permutedims(glcm, (2, 1, 3))
+    end
+
+    # Normalize each direction
+    for d in 1:13
+        s = sum(@view glcm[:, :, d])
+        if s > 0
+            glcm[:, :, d] ./= s
+        end
+    end
+
+    return glcm
+end
+```
+
+### 11. References
+
+- [PyRadiomics GLCM Documentation](https://pyradiomics.readthedocs.io/en/latest/features.html)
+- [PyRadiomics GLCM Source Code](https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/glcm.py)
+- [IBSI Feature Documentation](https://ibsi.readthedocs.io/en/latest/03_Image_features.html)
+- Haralick, R.M. et al. (1973). "Textural Features for Image Classification"
+
+---
+

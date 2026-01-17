@@ -5183,3 +5183,68 @@ Maximum3DDiameter: 7.55  # Close to diagonal √(5²+5²+5²) ≈ 8.66
 
 ---
 
+
+### Iteration 21 - 2026-01-17 14:14:06
+
+**Agent started** (Open: 28, Done: 20)
+
+
+### Iteration 22 - 2026-01-17 14:44:41
+
+**Agent started** (Open: 28, Done: 20)
+
+**Story Completed: TEST-SHAPE-PARITY**
+
+#### Summary
+Verified all shape features (2D and 3D) match PyRadiomics exactly. All 456 tests pass.
+
+#### Issues Found and Fixed
+
+1. **2D Shape Test PyRadiomics Initialization**:
+   - Original: Used wrong constructor syntax for PyRadiomics Shape2D class
+   - Fix: Changed to `shape2d_class(sitk_image, sitk_mask; force2D=true, force2Ddimension=0)`
+   - The force2Ddimension=0 is required for 3D arrays with z=1 slice
+
+2. **Marching Squares Line Table Ordering**:
+   - Bug: The `line_table` in `_marching_squares_2d()` had incorrectly ordered edge pairs
+   - Effect: MeshSurface values were approximately 2x the correct values
+   - Root cause: The shoelace formula requires consistently-oriented segment pairs
+   - Fix: Updated line_table to match PyRadiomics `lineTable2D` exactly:
+     - Case 1 (0x1): Changed from `(0, 3)` to `(3, 0)`
+     - Case 7 (0x7): Changed from `(2, 3)` to `(3, 2)`
+     - Case 9 (0x9): Changed from `(0, 2)` to `(2, 0)`
+     - Case 11 (0xB): Changed from `(1, 2)` to `(2, 1)`
+     - Case 13 (0xD): Changed from `(0, 1)` to `(1, 0)`
+     - Case 14 (0xE): Kept `(0, 3)` unchanged
+
+#### Test Results
+
+All shape parity tests pass:
+- **3D Shape Features**: 30 tests passed
+  - MeshVolume, VoxelVolume, SurfaceArea, SurfaceVolumeRatio
+  - Sphericity, Compactness1, Compactness2, SphericalDisproportion
+  - Maximum3DDiameter, Maximum2DDiameterSlice/Column/Row
+  - MajorAxisLength, MinorAxisLength, LeastAxisLength
+  - Elongation, Flatness
+
+- **2D Shape Features**: 22 tests passed
+  - PixelSurface (exact match)
+  - MeshSurface (fixed - now exact match)
+  - Perimeter
+  - PerimeterSurfaceRatio
+  - Sphericity (Circularity)
+  - MaximumDiameter
+  - MajorAxisLength, MinorAxisLength
+  - Elongation
+  - Non-isotropic spacing tests
+
+#### Files Modified
+- `src/shape.jl`: Fixed line_table ordering for correct shoelace calculation
+- `test/test_shape.jl`: Fixed PyRadiomics Shape2D extractor initialization
+
+#### Test Evidence
+```
+Test Summary: | Pass  Total     Time
+Radiomics.jl  |  456    456  1m41.1s
+```
+

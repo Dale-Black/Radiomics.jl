@@ -61,24 +61,27 @@ function _marching_squares_2d(mask::AbstractMatrix{Bool}, spacing::NTuple{2,<:Re
 
     # Lookup table: index → [(edge1, edge2), ...] line segments
     # Index is 4-bit value from corner occupancy: bit i = corner i inside mask
+    # Edge pairs define segment direction: FROM edge1 TO edge2
+    # This ordering is critical for correct area calculation using shoelace formula
     # -1 indicates no segment
+    # Table matches PyRadiomics lineTable2D exactly for correct orientation
     line_table = [
-        [(-1, -1), (-1, -1)],  # 0: all outside
-        [(0, 3), (-1, -1)],    # 1: corner 0 inside
-        [(0, 1), (-1, -1)],    # 2: corner 1 inside
-        [(1, 3), (-1, -1)],    # 3: corners 0,1 inside
-        [(1, 2), (-1, -1)],    # 4: corner 2 inside
-        [(0, 1), (2, 3)],      # 5: corners 0,2 inside (ambiguous - two segments)
-        [(0, 2), (-1, -1)],    # 6: corners 1,2 inside
-        [(2, 3), (-1, -1)],    # 7: corners 0,1,2 inside
-        [(2, 3), (-1, -1)],    # 8: corner 3 inside
-        [(0, 2), (-1, -1)],    # 9: corners 0,3 inside
-        [(0, 3), (1, 2)],      # 10: corners 1,3 inside (ambiguous - two segments)
-        [(1, 2), (-1, -1)],    # 11: corners 0,1,3 inside
-        [(1, 3), (-1, -1)],    # 12: corners 2,3 inside
-        [(0, 1), (-1, -1)],    # 13: corners 0,2,3 inside
-        [(0, 3), (-1, -1)],    # 14: corners 1,2,3 inside
-        [(-1, -1), (-1, -1)]   # 15: all inside
+        [(-1, -1), (-1, -1)],  # 0 (0x0): all outside
+        [(3, 0), (-1, -1)],    # 1 (0x1): p0 inside
+        [(0, 1), (-1, -1)],    # 2 (0x2): p1 inside
+        [(3, 1), (-1, -1)],    # 3 (0x3): p0,p1 inside
+        [(1, 2), (-1, -1)],    # 4 (0x4): p2 inside
+        [(1, 2), (3, 0)],      # 5 (0x5): p0,p2 inside (ambiguous - two segments)
+        [(0, 2), (-1, -1)],    # 6 (0x6): p1,p2 inside
+        [(3, 2), (-1, -1)],    # 7 (0x7): p0,p1,p2 inside
+        [(2, 3), (-1, -1)],    # 8 (0x8): p3 inside
+        [(2, 0), (-1, -1)],    # 9 (0x9): p0,p3 inside
+        [(0, 1), (2, 3)],      # 10 (0xA): p1,p3 inside (ambiguous - two segments)
+        [(2, 1), (-1, -1)],    # 11 (0xB): p0,p1,p3 inside
+        [(1, 3), (-1, -1)],    # 12 (0xC): p2,p3 inside
+        [(1, 0), (-1, -1)],    # 13 (0xD): p0,p2,p3 inside
+        [(0, 3), (-1, -1)],    # 14 (0xE): p1,p2,p3 inside
+        [(-1, -1), (-1, -1)]   # 15 (0xF): all inside
     ]
 
     vertices = NTuple{2,Float64}[]

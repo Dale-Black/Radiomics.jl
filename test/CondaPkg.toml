@@ -1,27 +1,10 @@
 [deps]
-# Python version constraint (pyradiomics best tested with 3.11)
-python = ">=3.10,<3.12"
-
-# NumPy version constraint for compatibility (needed for pyradiomics build)
-numpy = ">=1.20,<2.0"
-
-# SimpleITK for image handling (required by pyradiomics)
-simpleitk = ">=2.2"
-
-# PyWavelets required by pyradiomics
-pywavelets = ">=1.4"
-
-# pykwalify required by pyradiomics
-pykwalify = ">=1.6"
-
-# Cython needed for building pyradiomics C extensions
-cython = ""
-
-# Setuptools needed for pyradiomics build
-setuptools = ""
-
-# Wheel needed for pyradiomics build
-wheel = ""
-
-# pip for installing pyradiomics with no build isolation
 pip = ""
+cython = ""
+pywavelets = ">=1.4"
+wheel = ""
+numpy = ">=1.20,<2.0"
+simpleitk = ">=2.2"
+python = ">=3.10,<3.12"
+pykwalify = ">=1.6"
+setuptools = ""

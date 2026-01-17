@@ -59,7 +59,9 @@ include("test_utils.jl")
 
     # First-order feature parity tests
     include("test_firstorder.jl")
-    # include("test_shape.jl")
+
+    # Shape feature parity tests
+    include("test_shape.jl")
     # include("test_glcm.jl")
     # include("test_glrlm.jl")
     # include("test_glszm.jl")

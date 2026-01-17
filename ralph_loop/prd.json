@@ -511,7 +511,7 @@
       "title": "Test Shape Feature Parity",
       "description": "Verify all shape features match PyRadiomics",
       "priority": 21,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_shape.jl",
         "Test all 2D shape features against PyRadiomics",

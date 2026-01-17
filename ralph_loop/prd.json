@@ -479,7 +479,7 @@
       "title": "Implement 3D Shape Features",
       "description": "Implement all 3D shape features",
       "priority": 20,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement mesh generation from mask",
         "Implement MeshVolume",

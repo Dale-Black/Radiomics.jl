@@ -30,6 +30,8 @@ module Radiomics
 
 using Statistics
 using LinearAlgebra
+using Meshing
+using GeometryBasics
 
 # Package version
 const VERSION = v"0.1.0"
@@ -127,5 +129,14 @@ export perimeter_surface_ratio_2d, sphericity_2d, spherical_disproportion_2d
 export maximum_diameter_2d, major_axis_length_2d, minor_axis_length_2d, elongation_2d
 export extract_shape_2d, extract_shape_2d_to_featureset!
 export shape_2d_feature_names, shape_2d_ibsi_features
+
+# Export 3D shape feature functions
+export mesh_volume, voxel_volume_3d, surface_area, surface_volume_ratio
+export sphericity_3d, compactness1, compactness2, spherical_disproportion_3d
+export maximum_3d_diameter, maximum_2d_diameter_slice, maximum_2d_diameter_column, maximum_2d_diameter_row
+export major_axis_length_3d, minor_axis_length_3d, least_axis_length
+export elongation_3d, flatness
+export extract_shape_3d, extract_shape_3d_to_featureset!
+export shape_3d_feature_names, shape_3d_ibsi_features
 
 end # module Radiomics

@@ -5086,3 +5086,100 @@ Sphericity: 0.94    # Expected (square is not a circle)
 - Ready for TEST-SHAPE-PARITY verification against PyRadiomics
 
 ---
+
+### Iteration 20 - 2026-01-17 14:02:49
+
+**Agent started** (Open: 29, Done: 19)
+
+
+
+### Iteration 21 - 2026-01-17
+
+**Story**: IMPL-SHAPE-3D
+**Status**: ✅ COMPLETED
+
+---
+
+## 3D Shape Features Implementation
+
+### Summary
+
+Implemented all 17 3D shape features in `src/shape.jl` following PyRadiomics conventions.
+
+### Features Implemented
+
+| # | Feature | Function | Formula | IBSI Code | Notes |
+|---|---------|----------|---------|-----------|-------|
+| 1 | Mesh Volume | `mesh_volume()` | V = Σ(Oa·(Ob×Oc))/6 | RNU0 | Signed tetrahedra method |
+| 2 | Voxel Volume | `voxel_volume_3d()` | V = Nₚ × Vᵥₒₓₑₗ | - | Voxel count |
+| 3 | Surface Area | `surface_area()` | A = Σ½\|ab×ac\| | C0JK | Mesh triangle areas |
+| 4 | Surface-Volume Ratio | `surface_volume_ratio()` | A/V | 2PR5 | mm⁻¹ |
+| 5 | Sphericity | `sphericity_3d()` | ∛(36πV²)/A | QCFX | Range: (0,1] |
+| 6 | Compactness 1 | `compactness1()` | V/(√π × A^(3/2)) | SKGS | **Deprecated** |
+| 7 | Compactness 2 | `compactness2()` | 36π(V²/A³) | BQWJ | **Deprecated** |
+| 8 | Spherical Disproportion | `spherical_disproportion_3d()` | 1/Sphericity | KRCK | **Deprecated** |
+| 9 | Maximum 3D Diameter | `maximum_3d_diameter()` | max(‖Xᵢ-Xⱼ‖) | L0JK | Feret diameter |
+| 10 | Max 2D Diameter (Slice) | `maximum_2d_diameter_slice()` | max in XY plane | - | Axial |
+| 11 | Max 2D Diameter (Column) | `maximum_2d_diameter_column()` | max in XZ plane | - | Coronal |
+| 12 | Max 2D Diameter (Row) | `maximum_2d_diameter_row()` | max in YZ plane | - | Sagittal |
+| 13 | Major Axis Length | `major_axis_length_3d()` | 4√λ_major | TDIC | PCA |
+| 14 | Minor Axis Length | `minor_axis_length_3d()` | 4√λ_minor | P9VJ | PCA |
+| 15 | Least Axis Length | `least_axis_length()` | 4√λ_least | 7J51 | PCA |
+| 16 | Elongation | `elongation_3d()` | √(λ_minor/λ_major) | Q3CK | Range: [0,1] |
+| 17 | Flatness | `flatness()` | √(λ_least/λ_major) | N17B | Range: [0,1] |
+
+### Key Implementation Details
+
+#### Marching Cubes Mesh Generation
+- Uses Meshing.jl with MarchingCubes algorithm at iso=0.5
+- Vertices returned in normalized [-1, 1]³ space, transformed to physical coordinates
+- Padding applied to handle boundary voxels (matches PyRadiomics)
+- Function: `_generate_mesh_3d(mask, spacing)`
+
+#### Volume Calculation (Signed Tetrahedra)
+For each mesh triangle with vertices a, b, c:
+```
+V = |Σᵢ (a · (b × c)) / 6|
+```
+Uses scalar triple product to compute signed volume of tetrahedra formed with origin.
+
+#### Surface Area Calculation
+For each triangle with edge vectors ab and ac:
+```
+A_triangle = ½|ab × ac|
+```
+Total area is sum of all triangle areas.
+
+#### PCA for Axis Lengths
+- Physical coordinates centered at mean and normalized by √N
+- Covariance matrix: C = X'X
+- Eigenvalues sorted ascending: [λ_least, λ_minor, λ_major]
+- Axis length = 4√λ
+
+### Dependencies Added
+- `Meshing.jl` - For marching cubes isosurface extraction
+- `GeometryBasics.jl` - For Point3f and Vec3f types
+
+### Files Modified
+- `Project.toml` - Added Meshing and GeometryBasics dependencies
+- `src/shape.jl` - Added all 17 3D shape features (1200+ new lines)
+- `src/Radiomics.jl` - Added exports for 3D shape functions
+
+### Test Results (5×5×5 cube)
+```julia
+VoxelVolume: 125.0       # Correct (5³)
+MeshVolume: 118.17       # Close (marching cubes smoothing)
+SurfaceArea: 131.67      # Close to 150 (6×25)
+Sphericity: 0.884        # Expected for cube
+Elongation: 1.0          # Correct (isotropic)
+Flatness: 1.0            # Correct (isotropic)
+Maximum3DDiameter: 7.55  # Close to diagonal √(5²+5²+5²) ≈ 8.66
+```
+
+### Notes
+- All deprecated features included for PyRadiomics compatibility
+- Marching cubes vertices are at edge midpoints, causing slight differences from voxel-based calculations
+- All 395 existing tests pass with new implementation
+
+---
+

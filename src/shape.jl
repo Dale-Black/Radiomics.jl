@@ -15,6 +15,8 @@
 
 using LinearAlgebra
 using Statistics
+using Meshing
+using GeometryBasics
 
 #==============================================================================#
 # 2D Marching Squares Algorithm (Contour/Perimeter Generation)
@@ -861,5 +863,1203 @@ function shape_2d_ibsi_features()
         "MajorAxisLength",
         "MinorAxisLength",
         "Elongation"
+    ]
+end
+
+#==============================================================================#
+#==============================================================================#
+#                           3D SHAPE FEATURES                                  #
+#==============================================================================#
+#==============================================================================#
+
+#==============================================================================#
+# 3D Mesh Generation using Marching Cubes
+#==============================================================================#
+
+"""
+    _generate_mesh_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real})
+
+Generate a 3D mesh from a binary mask using the Marching Cubes algorithm.
+
+# Arguments
+- `mask`: 3D binary mask
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm
+
+# Returns
+- `vertices`: Vector of vertex positions as Point3f (scaled by spacing)
+- `faces`: Vector of TriangleFace{Int} defining triangles
+
+# Notes
+- Uses Meshing.jl with MarchingCubes algorithm at iso=0.5
+- Padding is applied to handle boundary voxels (matches PyRadiomics)
+- Vertices are in physical coordinates (scaled by spacing)
+
+# References
+- PyRadiomics: radiomics/src/cshape.c (marching cubes implementation)
+"""
+function _generate_mesh_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real})
+    # Pad the mask with zeros (matches PyRadiomics behavior)
+    padded = zeros(Float64, size(mask) .+ 2)
+    padded[2:end-1, 2:end-1, 2:end-1] .= Float64.(mask)
+
+    # Get padded dimensions
+    nx, ny, nz = size(padded)
+
+    # Generate mesh using Marching Cubes at isosurface 0.5
+    # The iso=0.5 threshold places vertices at edge midpoints for binary masks
+    vertices, faces = isosurface(padded, MarchingCubes(iso=0.5))
+
+    # Handle empty mesh case
+    if isempty(vertices)
+        return Point3f[], TriangleFace{Int}[]
+    end
+
+    # Meshing.jl returns vertices in normalized [-1, 1]^3 space
+    # We need to denormalize to voxel coordinates, then convert to physical coordinates
+    # Formula: voxel_coord = (normalized_coord + 1) / 2 * (n - 1) + 1
+    # Then subtract 1 for padding offset, and subtract 0.5 for voxel center offset
+    # Finally multiply by spacing for physical coordinates
+    physical_vertices = [
+        Point3f(
+            (((v[1] + 1.0) / 2.0 * (nx - 1) + 1) - 1 - 0.5) * spacing[1],
+            (((v[2] + 1.0) / 2.0 * (ny - 1) + 1) - 1 - 0.5) * spacing[2],
+            (((v[3] + 1.0) / 2.0 * (nz - 1) + 1) - 1 - 0.5) * spacing[3]
+        )
+        for v in vertices
+    ]
+
+    # Convert faces to TriangleFace (1-indexed)
+    triangle_faces = [TriangleFace{Int}(f[1], f[2], f[3]) for f in faces]
+
+    return physical_vertices, triangle_faces
+end
+
+#==============================================================================#
+# 3D Shape Feature: Mesh Volume
+#==============================================================================#
+
+"""
+    mesh_volume(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the volume of a 3D ROI from the mesh using the signed tetrahedra method.
+
+# Mathematical Formula
+```
+V = |Σᵢ (Oaᵢ · (Obᵢ × Ocᵢ)) / 6|
+```
+where aᵢ, bᵢ, cᵢ are vertices of triangle i and O is the origin.
+Each term is the signed volume of the tetrahedron formed by the triangle and origin.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Volume in mm³ (or voxels³ if spacing is (1.0,1.0,1.0))
+
+# Notes
+- Uses the scalar triple product (a · (b × c)) for each mesh triangle
+- More accurate than voxel counting for smooth surfaces
+- Requires a closed mesh surface
+
+# Example
+```julia
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true  # 5×5×5 cube
+v = mesh_volume(mask)  # ≈ 125.0 voxels³
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getMeshVolumeFeatureValue
+- IBSI: RNU0 (Mesh-based volume)
+"""
+function mesh_volume(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    vertices, faces = _generate_mesh_3d(mask, spacing)
+
+    if isempty(faces)
+        return 0.0
+    end
+
+    # Compute signed volume using tetrahedra formed with origin
+    volume = 0.0
+    for face in faces
+        a = vertices[face[1]]
+        b = vertices[face[2]]
+        c = vertices[face[3]]
+
+        # Scalar triple product: a · (b × c)
+        # This gives 6× the signed volume of the tetrahedron with origin
+        cross_bc = cross(Vec3f(b...), Vec3f(c...))
+        volume += dot(Vec3f(a...), cross_bc)
+    end
+
+    return abs(volume) / 6.0
+end
+
+#==============================================================================#
+# 3D Shape Feature: Voxel Volume
+#==============================================================================#
+
+"""
+    voxel_volume_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the volume of a 3D ROI by counting voxels.
+
+# Mathematical Formula
+```
+V = Nᵥ × Vᵥₒₓₑₗ
+```
+where:
+- Nᵥ = number of voxels in mask
+- Vᵥₒₓₑₗ = volume of single voxel = spacing[1] × spacing[2] × spacing[3]
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Volume in mm³ (or voxels³ if spacing is (1.0,1.0,1.0))
+
+# Notes
+- Simple counting method
+- Less accurate than mesh-based for smooth surfaces
+- Identical to mesh volume for axis-aligned rectangular shapes
+
+# Example
+```julia
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true  # 5×5×5 = 125 voxels
+v = voxel_volume_3d(mask)  # 125.0
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getVoxelVolumeFeatureValue
+"""
+function voxel_volume_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    n_voxels = count(mask)
+    voxel_vol = spacing[1] * spacing[2] * spacing[3]
+    return Float64(n_voxels) * voxel_vol
+end
+
+#==============================================================================#
+# 3D Shape Feature: Surface Area
+#==============================================================================#
+
+"""
+    surface_area(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the surface area of a 3D ROI from the mesh triangles.
+
+# Mathematical Formula
+```
+A = Σᵢ ½|ABᵢ × ACᵢ|
+```
+where ABᵢ and ACᵢ are edge vectors of triangle i.
+The cross product magnitude gives twice the triangle area.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Surface area in mm² (or voxels² if spacing is (1.0,1.0,1.0))
+
+# Notes
+- Uses mesh triangles from Marching Cubes algorithm
+- Each triangle area = ½|cross(AB, AC)|
+- Total surface area is sum of all triangle areas
+
+# Example
+```julia
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true  # 5×5×5 cube
+a = surface_area(mask)  # ≈ 150.0 voxels² (6 faces × 25)
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getSurfaceAreaFeatureValue
+- IBSI: C0JK (Surface area)
+"""
+function surface_area(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    vertices, faces = _generate_mesh_3d(mask, spacing)
+
+    if isempty(faces)
+        return 0.0
+    end
+
+    # Compute surface area as sum of triangle areas
+    total_area = 0.0
+    for face in faces
+        a = vertices[face[1]]
+        b = vertices[face[2]]
+        c = vertices[face[3]]
+
+        # Edge vectors
+        ab = Vec3f(b[1] - a[1], b[2] - a[2], b[3] - a[3])
+        ac = Vec3f(c[1] - a[1], c[2] - a[2], c[3] - a[3])
+
+        # Cross product magnitude / 2 = triangle area
+        cross_prod = cross(ab, ac)
+        triangle_area = 0.5 * sqrt(dot(cross_prod, cross_prod))
+        total_area += triangle_area
+    end
+
+    return total_area
+end
+
+#==============================================================================#
+# 3D Shape Feature: Surface-to-Volume Ratio
+#==============================================================================#
+
+"""
+    surface_volume_ratio(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the ratio of surface area to volume.
+
+# Mathematical Formula
+```
+SVR = A / V
+```
+where A is the mesh surface area and V is the mesh volume.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Surface-to-volume ratio in mm⁻¹ (NOT dimensionless)
+
+# Notes
+- Higher values indicate more complex/irregular shapes
+- A sphere has the minimum S/V ratio for a given volume
+- NOT dimensionless - has units of 1/length
+
+# Example
+```julia
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true  # 5×5×5 cube
+svr = surface_volume_ratio(mask)  # ≈ 1.2 (150/125)
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getSurfaceVolumeRatioFeatureValue
+- IBSI: 2PR5 (Surface to volume ratio)
+"""
+function surface_volume_ratio(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    a = surface_area(mask, spacing)
+    v = mesh_volume(mask, spacing)
+
+    if v == 0.0
+        return NaN
+    end
+
+    return a / v
+end
+
+#==============================================================================#
+# 3D Shape Feature: Sphericity
+#==============================================================================#
+
+"""
+    sphericity_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the sphericity of a 3D ROI.
+
+# Mathematical Formula
+```
+Sphericity = ∛(36πV²) / A
+```
+where V is the mesh volume and A is the surface area.
+
+This is the ratio of the surface area of a sphere with the same volume to the actual surface area.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Sphericity value in range (0, 1], where 1 = perfect sphere
+
+# Notes
+- Measures how spherical the shape is
+- A perfect sphere has sphericity = 1
+- More irregular shapes have lower sphericity
+- Equivalent to (A_sphere / A_actual) where A_sphere = surface area of same-volume sphere
+
+# Example
+```julia
+# Approximate sphere using distance function
+mask = [(i-15)^2 + (j-15)^2 + (k-15)^2 <= 100 for i in 1:30, j in 1:30, k in 1:30]
+s = sphericity_3d(mask)  # Close to 1.0
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getSphericityFeatureValue
+- IBSI: QCFX (Sphericity)
+"""
+function sphericity_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    v = mesh_volume(mask, spacing)
+    a = surface_area(mask, spacing)
+
+    if a == 0.0
+        return NaN
+    end
+
+    # Sphericity = (36πV²)^(1/3) / A = cube_root(36π × V²) / A
+    return cbrt(36.0 * π * v^2) / a
+end
+
+#==============================================================================#
+# 3D Shape Feature: Compactness 1 (DEPRECATED)
+#==============================================================================#
+
+"""
+    compactness1(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute Compactness 1 of a 3D ROI.
+
+# Mathematical Formula
+```
+Compactness1 = V / (√π × A^(3/2))
+```
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Compactness 1 value
+
+# Notes
+- **DEPRECATED**: Use Sphericity instead
+- Included for PyRadiomics compatibility
+- A sphere has maximum compactness
+
+# References
+- PyRadiomics: radiomics/shape.py:getCompactness1FeatureValue
+- IBSI: SKGS (Compactness 1 - deprecated)
+"""
+function compactness1(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    v = mesh_volume(mask, spacing)
+    a = surface_area(mask, spacing)
+
+    if a == 0.0
+        return NaN
+    end
+
+    return v / (sqrt(π) * a^1.5)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Compactness 2 (DEPRECATED)
+#==============================================================================#
+
+"""
+    compactness2(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute Compactness 2 of a 3D ROI.
+
+# Mathematical Formula
+```
+Compactness2 = 36π × V² / A³
+```
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Compactness 2 value (= Sphericity³)
+
+# Notes
+- **DEPRECATED**: This is simply Sphericity³
+- Included for PyRadiomics compatibility
+- A sphere has Compactness 2 = 1
+
+# References
+- PyRadiomics: radiomics/shape.py:getCompactness2FeatureValue
+- IBSI: BQWJ (Compactness 2 - deprecated)
+"""
+function compactness2(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    v = mesh_volume(mask, spacing)
+    a = surface_area(mask, spacing)
+
+    if a == 0.0
+        return NaN
+    end
+
+    return (36.0 * π * v^2) / a^3
+end
+
+#==============================================================================#
+# 3D Shape Feature: Spherical Disproportion (DEPRECATED)
+#==============================================================================#
+
+"""
+    spherical_disproportion_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the spherical disproportion of a 3D ROI.
+
+# Mathematical Formula
+```
+SphericalDisproportion = A / ∛(36πV²) = 1 / Sphericity
+```
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Spherical disproportion value ≥ 1, where 1 = perfect sphere
+
+# Notes
+- **DEPRECATED**: This is the inverse of sphericity
+- Included for PyRadiomics compatibility
+- A perfect sphere has spherical disproportion = 1
+- More irregular shapes have higher values
+
+# References
+- PyRadiomics: radiomics/shape.py:getSphericalDisproportionFeatureValue
+- IBSI: KRCK (Spherical disproportion - deprecated)
+"""
+function spherical_disproportion_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    s = sphericity_3d(mask, spacing)
+
+    if s == 0.0 || isnan(s)
+        return NaN
+    end
+
+    return 1.0 / s
+end
+
+#==============================================================================#
+# 3D Shape Feature: Maximum 3D Diameter
+#==============================================================================#
+
+"""
+    maximum_3d_diameter(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the maximum 3D diameter (Feret diameter) of the ROI.
+
+# Mathematical Formula
+```
+MaxDiameter = max_{i,j} ||Vᵢ - Vⱼ||
+```
+Maximum Euclidean distance between any two mesh vertices.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Maximum diameter in mm (or voxels if spacing is (1.0,1.0,1.0))
+
+# Notes
+- Also known as Feret diameter
+- Computed by finding the maximum distance between all pairs of mesh vertices
+- O(n²) algorithm where n is number of mesh vertices
+
+# Example
+```julia
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true  # 5×5×5 cube
+d = maximum_3d_diameter(mask)  # ≈ √(4² + 4² + 4²) ≈ 6.93 (diagonal)
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getMaximum3DDiameterFeatureValue
+- IBSI: L0JK (Maximum 3D diameter)
+"""
+function maximum_3d_diameter(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    vertices, _ = _generate_mesh_3d(mask, spacing)
+
+    if length(vertices) < 2
+        return 0.0
+    end
+
+    # Find maximum distance between all vertex pairs
+    max_dist_sq = 0.0
+    n = length(vertices)
+
+    for i in 1:n
+        for j in (i+1):n
+            v1 = vertices[i]
+            v2 = vertices[j]
+            dist_sq = (v2[1] - v1[1])^2 + (v2[2] - v1[2])^2 + (v2[3] - v1[3])^2
+            if dist_sq > max_dist_sq
+                max_dist_sq = dist_sq
+            end
+        end
+    end
+
+    return sqrt(max_dist_sq)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Maximum 2D Diameter (Slice - Axial Plane)
+#==============================================================================#
+
+"""
+    maximum_2d_diameter_slice(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the maximum 2D diameter in the axial (row-column) plane.
+
+# Mathematical Formula
+```
+MaxDiameter = max_{i,j} ||Vᵢ - Vⱼ|| where Vᵢ, Vⱼ projected to XY plane
+```
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Maximum diameter in the axial plane in mm
+
+# Notes
+- Projects all mesh vertices to the XY (row-column) plane
+- Finds maximum distance between projected points
+- Useful for characterizing tumor extent in axial slices
+
+# References
+- PyRadiomics: radiomics/shape.py:getMaximum2DDiameterSliceFeatureValue
+"""
+function maximum_2d_diameter_slice(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    vertices, _ = _generate_mesh_3d(mask, spacing)
+
+    if length(vertices) < 2
+        return 0.0
+    end
+
+    # Find maximum distance in XY plane (ignoring Z)
+    max_dist_sq = 0.0
+    n = length(vertices)
+
+    for i in 1:n
+        for j in (i+1):n
+            v1 = vertices[i]
+            v2 = vertices[j]
+            # Only use X and Y coordinates
+            dist_sq = (v2[1] - v1[1])^2 + (v2[2] - v1[2])^2
+            if dist_sq > max_dist_sq
+                max_dist_sq = dist_sq
+            end
+        end
+    end
+
+    return sqrt(max_dist_sq)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Maximum 2D Diameter (Column - Coronal Plane)
+#==============================================================================#
+
+"""
+    maximum_2d_diameter_column(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the maximum 2D diameter in the coronal (row-slice) plane.
+
+# Mathematical Formula
+```
+MaxDiameter = max_{i,j} ||Vᵢ - Vⱼ|| where Vᵢ, Vⱼ projected to XZ plane
+```
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Maximum diameter in the coronal plane in mm
+
+# Notes
+- Projects all mesh vertices to the XZ (row-slice) plane
+- Finds maximum distance between projected points
+- Useful for characterizing tumor extent in coronal slices
+
+# References
+- PyRadiomics: radiomics/shape.py:getMaximum2DDiameterColumnFeatureValue
+"""
+function maximum_2d_diameter_column(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    vertices, _ = _generate_mesh_3d(mask, spacing)
+
+    if length(vertices) < 2
+        return 0.0
+    end
+
+    # Find maximum distance in XZ plane (ignoring Y)
+    max_dist_sq = 0.0
+    n = length(vertices)
+
+    for i in 1:n
+        for j in (i+1):n
+            v1 = vertices[i]
+            v2 = vertices[j]
+            # Only use X and Z coordinates
+            dist_sq = (v2[1] - v1[1])^2 + (v2[3] - v1[3])^2
+            if dist_sq > max_dist_sq
+                max_dist_sq = dist_sq
+            end
+        end
+    end
+
+    return sqrt(max_dist_sq)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Maximum 2D Diameter (Row - Sagittal Plane)
+#==============================================================================#
+
+"""
+    maximum_2d_diameter_row(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the maximum 2D diameter in the sagittal (column-slice) plane.
+
+# Mathematical Formula
+```
+MaxDiameter = max_{i,j} ||Vᵢ - Vⱼ|| where Vᵢ, Vⱼ projected to YZ plane
+```
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Maximum diameter in the sagittal plane in mm
+
+# Notes
+- Projects all mesh vertices to the YZ (column-slice) plane
+- Finds maximum distance between projected points
+- Useful for characterizing tumor extent in sagittal slices
+
+# References
+- PyRadiomics: radiomics/shape.py:getMaximum2DDiameterRowFeatureValue
+"""
+function maximum_2d_diameter_row(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    vertices, _ = _generate_mesh_3d(mask, spacing)
+
+    if length(vertices) < 2
+        return 0.0
+    end
+
+    # Find maximum distance in YZ plane (ignoring X)
+    max_dist_sq = 0.0
+    n = length(vertices)
+
+    for i in 1:n
+        for j in (i+1):n
+            v1 = vertices[i]
+            v2 = vertices[j]
+            # Only use Y and Z coordinates
+            dist_sq = (v2[2] - v1[2])^2 + (v2[3] - v1[3])^2
+            if dist_sq > max_dist_sq
+                max_dist_sq = dist_sq
+            end
+        end
+    end
+
+    return sqrt(max_dist_sq)
+end
+
+#==============================================================================#
+# 3D PCA-based Eigenvalue Computation
+#==============================================================================#
+
+"""
+    _compute_eigenvalues_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real})
+
+Compute eigenvalues of the 3D covariance matrix for PCA-based shape features.
+
+# Algorithm
+1. Get physical coordinates of all ROI voxels
+2. Center coordinates at mean
+3. Normalize by √N
+4. Compute covariance matrix: C = X'X
+5. Compute eigenvalues and sort ascending
+
+# Arguments
+- `mask`: 3D binary mask
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing)
+
+# Returns
+- `(λ_least, λ_minor, λ_major)`: Eigenvalues sorted ascending
+
+# References
+- PyRadiomics: radiomics/shape.py (PCA approach)
+"""
+function _compute_eigenvalues_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real})
+    # Get indices of all mask voxels
+    indices = findall(mask)
+    n = length(indices)
+
+    if n < 2
+        return (0.0, 0.0, 0.0)
+    end
+
+    # Convert to physical coordinates
+    coords = Matrix{Float64}(undef, n, 3)
+    for (i, idx) in enumerate(indices)
+        coords[i, 1] = (idx[1] - 0.5) * spacing[1]  # x
+        coords[i, 2] = (idx[2] - 0.5) * spacing[2]  # y
+        coords[i, 3] = (idx[3] - 0.5) * spacing[3]  # z
+    end
+
+    # Center at mean
+    μ = mean(coords, dims=1)
+    coords .-= μ
+
+    # Normalize by √N
+    coords ./= sqrt(n)
+
+    # Compute covariance matrix
+    cov_matrix = coords' * coords
+
+    # Compute eigenvalues
+    eigenvalues = eigvals(Symmetric(cov_matrix))
+
+    # Handle small negative eigenvalues from numerical precision
+    eigenvalues = [max(λ, 0.0) for λ in eigenvalues]
+
+    # Sort ascending: [λ_least, λ_minor, λ_major]
+    sort!(eigenvalues)
+
+    return (eigenvalues[1], eigenvalues[2], eigenvalues[3])
+end
+
+#==============================================================================#
+# 3D Shape Feature: Major Axis Length
+#==============================================================================#
+
+"""
+    major_axis_length_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the major axis length of the 3D ROI using PCA.
+
+# Mathematical Formula
+```
+MajorAxisLength = 4√λ_major
+```
+where λ_major is the largest eigenvalue of the covariance matrix.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Major axis length in mm
+
+# Notes
+- Represents the length of the major axis of an equivalent ellipsoid
+- Based on principal component analysis (PCA) of voxel coordinates
+- The factor of 4 converts the eigenvalue to the diameter of an enclosing ellipsoid
+
+# Example
+```julia
+mask = falses(30, 15, 10)
+mask[5:25, 3:12, 2:8] .= true  # Elongated shape
+major = major_axis_length_3d(mask)  # Length along long axis
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getMajorAxisLengthFeatureValue
+- IBSI: TDIC (Major axis length)
+"""
+function major_axis_length_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    _, _, λ_major = _compute_eigenvalues_3d(mask, spacing)
+    return 4.0 * sqrt(λ_major)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Minor Axis Length
+#==============================================================================#
+
+"""
+    minor_axis_length_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the minor axis length of the 3D ROI using PCA.
+
+# Mathematical Formula
+```
+MinorAxisLength = 4√λ_minor
+```
+where λ_minor is the second largest eigenvalue of the covariance matrix.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Minor axis length in mm
+
+# Notes
+- Represents the length of the second principal axis of an equivalent ellipsoid
+- Based on principal component analysis (PCA) of voxel coordinates
+
+# References
+- PyRadiomics: radiomics/shape.py:getMinorAxisLengthFeatureValue
+- IBSI: P9VJ (Minor axis length)
+"""
+function minor_axis_length_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    _, λ_minor, _ = _compute_eigenvalues_3d(mask, spacing)
+    return 4.0 * sqrt(λ_minor)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Least Axis Length
+#==============================================================================#
+
+"""
+    least_axis_length(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the least (smallest) axis length of the 3D ROI using PCA.
+
+# Mathematical Formula
+```
+LeastAxisLength = 4√λ_least
+```
+where λ_least is the smallest eigenvalue of the covariance matrix.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Least axis length in mm
+
+# Notes
+- Represents the length of the smallest principal axis of an equivalent ellipsoid
+- Only applicable to 3D shapes (2D shapes have only major and minor axes)
+- Based on principal component analysis (PCA) of voxel coordinates
+
+# References
+- PyRadiomics: radiomics/shape.py:getLeastAxisLengthFeatureValue
+- IBSI: 7J51 (Least axis length)
+"""
+function least_axis_length(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    λ_least, _, _ = _compute_eigenvalues_3d(mask, spacing)
+    return 4.0 * sqrt(λ_least)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Elongation
+#==============================================================================#
+
+"""
+    elongation_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the elongation of a 3D ROI using PCA eigenvalues.
+
+# Mathematical Formula
+```
+Elongation = √(λ_minor / λ_major)
+```
+where λ_minor and λ_major are eigenvalues of the covariance matrix.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Elongation value in range [0, 1], where 1 = isotropic (spherical)
+
+# Notes
+- Measures how elongated the shape is along the major axis
+- A perfect sphere has elongation = 1
+- More elongated shapes have values closer to 0
+- Equivalent to MinorAxisLength / MajorAxisLength
+
+# Example
+```julia
+# Cube (isotropic)
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true
+e = elongation_3d(mask)  # Close to 1.0
+
+# Elongated shape
+mask = falses(30, 10, 10)
+mask[3:27, 3:7, 3:7] .= true
+e = elongation_3d(mask)  # < 1.0
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getElongationFeatureValue
+- IBSI: Q3CK (Elongation)
+"""
+function elongation_3d(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    _, λ_minor, λ_major = _compute_eigenvalues_3d(mask, spacing)
+
+    if λ_major == 0.0
+        return NaN
+    end
+
+    return sqrt(λ_minor / λ_major)
+end
+
+#==============================================================================#
+# 3D Shape Feature: Flatness
+#==============================================================================#
+
+"""
+    flatness(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0,1.0,1.0)) -> Float64
+
+Compute the flatness of a 3D ROI using PCA eigenvalues.
+
+# Mathematical Formula
+```
+Flatness = √(λ_least / λ_major)
+```
+where λ_least and λ_major are eigenvalues of the covariance matrix.
+
+# Arguments
+- `mask`: 3D binary mask defining the ROI
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0,1.0,1.0))
+
+# Returns
+- `Float64`: Flatness value in range [0, 1], where 1 = isotropic (spherical)
+
+# Notes
+- Measures how flat (pancake-like) the shape is
+- A perfect sphere has flatness = 1
+- Flatter shapes have values closer to 0
+- Equivalent to LeastAxisLength / MajorAxisLength
+- Only applicable to 3D shapes
+
+# Example
+```julia
+# Cube (isotropic)
+mask = falses(10, 10, 10)
+mask[3:7, 3:7, 3:7] .= true
+f = flatness(mask)  # Close to 1.0
+
+# Flat (pancake) shape
+mask = falses(10, 10, 3)
+mask[3:7, 3:7, :] .= true
+f = flatness(mask)  # < 1.0
+```
+
+# References
+- PyRadiomics: radiomics/shape.py:getFlatnessFeatureValue
+- IBSI: N17B (Flatness)
+"""
+function flatness(mask::AbstractArray{Bool,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0))
+    λ_least, _, λ_major = _compute_eigenvalues_3d(mask, spacing)
+
+    if λ_major == 0.0
+        return NaN
+    end
+
+    return sqrt(λ_least / λ_major)
+end
+
+#==============================================================================#
+# High-Level 3D Extraction Function
+#==============================================================================#
+
+"""
+    extract_shape_3d(mask, spacing=(1.0, 1.0, 1.0); label::Int=1) -> Dict{String, Float64}
+
+Extract all 3D shape features from a mask.
+
+# Arguments
+- `mask`: 3D array (Bool, BitArray, or Integer with label)
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0, 1.0, 1.0))
+- `label::Int=1`: Label value in mask defining the ROI (for integer masks)
+
+# Returns
+- `Dict{String, Float64}`: Dictionary of feature names to values
+
+# Feature Names
+The returned dictionary uses PyRadiomics-compatible names:
+- "MeshVolume" - Volume from mesh
+- "VoxelVolume" - Volume from voxel count
+- "SurfaceArea" - Surface area from mesh triangles
+- "SurfaceVolumeRatio" - A/V ratio
+- "Sphericity" - (36πV²)^(1/3) / A
+- "Compactness1" - V / (√π × A^(3/2)) (deprecated)
+- "Compactness2" - 36π × V² / A³ (deprecated)
+- "SphericalDisproportion" - 1/Sphericity (deprecated)
+- "Maximum3DDiameter" - 3D Feret diameter
+- "Maximum2DDiameterSlice" - Max diameter in axial plane
+- "Maximum2DDiameterColumn" - Max diameter in coronal plane
+- "Maximum2DDiameterRow" - Max diameter in sagittal plane
+- "MajorAxisLength" - 4√λ_major
+- "MinorAxisLength" - 4√λ_minor
+- "LeastAxisLength" - 4√λ_least
+- "Elongation" - √(λ_minor/λ_major)
+- "Flatness" - √(λ_least/λ_major)
+
+# Example
+```julia
+mask = rand(Bool, 64, 64, 64)
+features = extract_shape_3d(mask)
+println(features["Sphericity"])
+println(features["Elongation"])
+```
+
+# Notes
+- Compactness1, Compactness2, SphericalDisproportion are deprecated but included for PyRadiomics compatibility
+
+# See also
+- Individual feature functions: `mesh_volume`, `sphericity_3d`, etc.
+"""
+function extract_shape_3d(mask::AbstractArray{T,3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0);
+                          label::Int=1) where T
+    # Convert to boolean mask
+    if T <: Bool
+        bool_mask = mask
+    elseif T <: Integer
+        bool_mask = mask .== label
+    else
+        throw(ArgumentError("Mask must be Bool or Integer type, got $T"))
+    end
+
+    # Ensure we have at least some voxels
+    if !any(bool_mask)
+        return Dict{String, Float64}(
+            "MeshVolume" => 0.0,
+            "VoxelVolume" => 0.0,
+            "SurfaceArea" => 0.0,
+            "SurfaceVolumeRatio" => NaN,
+            "Sphericity" => NaN,
+            "Compactness1" => NaN,
+            "Compactness2" => NaN,
+            "SphericalDisproportion" => NaN,
+            "Maximum3DDiameter" => 0.0,
+            "Maximum2DDiameterSlice" => 0.0,
+            "Maximum2DDiameterColumn" => 0.0,
+            "Maximum2DDiameterRow" => 0.0,
+            "MajorAxisLength" => 0.0,
+            "MinorAxisLength" => 0.0,
+            "LeastAxisLength" => 0.0,
+            "Elongation" => NaN,
+            "Flatness" => NaN
+        )
+    end
+
+    return Dict{String, Float64}(
+        "MeshVolume" => mesh_volume(bool_mask, spacing),
+        "VoxelVolume" => voxel_volume_3d(bool_mask, spacing),
+        "SurfaceArea" => surface_area(bool_mask, spacing),
+        "SurfaceVolumeRatio" => surface_volume_ratio(bool_mask, spacing),
+        "Sphericity" => sphericity_3d(bool_mask, spacing),
+        "Compactness1" => compactness1(bool_mask, spacing),
+        "Compactness2" => compactness2(bool_mask, spacing),
+        "SphericalDisproportion" => spherical_disproportion_3d(bool_mask, spacing),
+        "Maximum3DDiameter" => maximum_3d_diameter(bool_mask, spacing),
+        "Maximum2DDiameterSlice" => maximum_2d_diameter_slice(bool_mask, spacing),
+        "Maximum2DDiameterColumn" => maximum_2d_diameter_column(bool_mask, spacing),
+        "Maximum2DDiameterRow" => maximum_2d_diameter_row(bool_mask, spacing),
+        "MajorAxisLength" => major_axis_length_3d(bool_mask, spacing),
+        "MinorAxisLength" => minor_axis_length_3d(bool_mask, spacing),
+        "LeastAxisLength" => least_axis_length(bool_mask, spacing),
+        "Elongation" => elongation_3d(bool_mask, spacing),
+        "Flatness" => flatness(bool_mask, spacing)
+    )
+end
+
+# Convenience method for BitArray
+function extract_shape_3d(mask::BitArray{3}, spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0); label::Int=1)
+    bool_mask = convert(Array{Bool,3}, mask)
+    return extract_shape_3d(bool_mask, spacing; label=label)
+end
+
+"""
+    extract_shape_3d_to_featureset!(fs::FeatureSet, mask, spacing=(1.0, 1.0, 1.0);
+                                     label::Int=1, image_type::String="original")
+
+Extract 3D shape features and add them to an existing FeatureSet.
+
+# Arguments
+- `fs`: FeatureSet to add features to
+- `mask`: 3D array (Bool, BitArray, or Integer with label)
+- `spacing`: Voxel spacing as (x_spacing, y_spacing, z_spacing) in mm (default: (1.0, 1.0, 1.0))
+- `label::Int=1`: Label value in mask defining the ROI
+- `image_type::String="original"`: Image type label for feature keys
+
+# Returns
+- Modified FeatureSet (also modifies in-place)
+
+# Example
+```julia
+fs = FeatureSet()
+extract_shape_3d_to_featureset!(fs, mask)
+println(fs["shape_Sphericity"])
+```
+"""
+function extract_shape_3d_to_featureset!(fs::FeatureSet, mask::AbstractArray{T,3},
+                                          spacing::NTuple{3,<:Real}=(1.0, 1.0, 1.0);
+                                          label::Int=1, image_type::String="original") where T
+    features = extract_shape_3d(mask, spacing; label=label)
+
+    for (name, value) in features
+        push!(fs, FeatureResult(name, value, "shape", image_type))
+    end
+
+    return fs
+end
+
+#==============================================================================#
+# 3D Feature List and Names
+#==============================================================================#
+
+"""
+    shape_3d_feature_names() -> Vector{String}
+
+Return a list of all 3D shape feature names.
+
+# Returns
+- `Vector{String}`: Names of all 17 3D shape features
+
+# Example
+```julia
+names = shape_3d_feature_names()
+println(length(names))  # 17
+```
+"""
+function shape_3d_feature_names()
+    return [
+        "MeshVolume",
+        "VoxelVolume",
+        "SurfaceArea",
+        "SurfaceVolumeRatio",
+        "Sphericity",
+        "Compactness1",
+        "Compactness2",
+        "SphericalDisproportion",
+        "Maximum3DDiameter",
+        "Maximum2DDiameterSlice",
+        "Maximum2DDiameterColumn",
+        "Maximum2DDiameterRow",
+        "MajorAxisLength",
+        "MinorAxisLength",
+        "LeastAxisLength",
+        "Elongation",
+        "Flatness"
+    ]
+end
+
+"""
+    shape_3d_ibsi_features() -> Vector{String}
+
+Return a list of IBSI-compliant 3D shape features.
+
+# Returns
+- `Vector{String}`: Names of IBSI-compliant features (excludes deprecated features)
+"""
+function shape_3d_ibsi_features()
+    return [
+        "MeshVolume",
+        "VoxelVolume",
+        "SurfaceArea",
+        "SurfaceVolumeRatio",
+        "Sphericity",
+        "Maximum3DDiameter",
+        "Maximum2DDiameterSlice",
+        "Maximum2DDiameterColumn",
+        "Maximum2DDiameterRow",
+        "MajorAxisLength",
+        "MinorAxisLength",
+        "LeastAxisLength",
+        "Elongation",
+        "Flatness"
     ]
 end

@@ -9073,3 +9073,80 @@ Verified comprehensive docstrings exist across all source files:
 
 ---
 
+
+### Iteration 65 - 2026-01-17 23:26:59
+
+**Agent started** (Open: 2, Done: 46)
+
+
+
+### Iteration 66 - 2026-01-17
+
+**Story**: DOCS-EXAMPLES
+**Status**: ✅ COMPLETED
+
+---
+
+## Usage Examples Summary
+
+Successfully created three comprehensive usage example files.
+
+### Example Files Created
+
+1. **examples/basic_extraction.jl** (195 lines)
+   - Simple feature extraction with `extract_all()`
+   - Using `RadiomicsFeatureExtractor`
+   - Selecting specific feature classes
+   - Working with voxel spacing
+   - Integer label masks
+   - Single-class extraction functions
+
+2. **examples/custom_settings.jl** (265 lines)
+   - Default settings overview
+   - Custom bin width effects
+   - Fixed bin count mode
+   - GLCM distance parameter
+   - GLDM alpha (coarseness) parameter
+   - NGTDM distance parameter
+   - Combined custom settings
+   - PyRadiomics compatibility settings
+   - Working with Settings object
+
+3. **examples/batch_processing.jl** (320 lines)
+   - Sequential batch processing
+   - Progress tracking during processing
+   - Extracting specific feature classes
+   - Results to table format
+   - Feature statistics across subjects
+   - Export to CSV format
+   - Multiple ROIs per image
+   - Memory-efficient processing pattern
+
+### Verification
+
+All three examples run without errors:
+```
+✓ basic_extraction.jl - 111 features extracted, all examples work
+✓ custom_settings.jl - Settings effects demonstrated, PyRadiomics parity shown
+✓ batch_processing.jl - 5 subjects processed, statistics computed, CSV export works
+```
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create examples/ folder | ✅ |
+| Write basic_extraction.jl example | ✅ |
+| Write custom_settings.jl example | ✅ |
+| Write batch_processing.jl example | ✅ |
+| All examples run without errors | ✅ |
+| Commit examples with descriptive message | ✅ |
+
+### Files Created
+
+- `examples/basic_extraction.jl` - NEW
+- `examples/custom_settings.jl` - NEW
+- `examples/batch_processing.jl` - NEW
+
+---
+

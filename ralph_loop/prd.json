@@ -1186,7 +1186,7 @@
       "title": "Create Usage Examples",
       "description": "Write example scripts demonstrating usage",
       "priority": 47,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create examples/ folder",
         "Write basic_extraction.jl example",

@@ -930,15 +930,26 @@ println(features["Entropy"])
 function extract_firstorder(image::AbstractArray{T, N}, mask::AbstractArray;
                             label::Int=1,
                             shift::Real=0,
-                            voxel_volume::Real=1.0) where {T<:Real, N}
+                            voxel_volume::Real=1.0,
+                            binwidth::Union{Real, Nothing}=nothing,
+                            bincount::Union{Int, Nothing}=nothing) where {T<:Real, N}
     # Extract voxels from ROI
     voxels = get_voxels(image, mask; label=label)
+
+    # For entropy and uniformity, PyRadiomics uses discretized voxels
+    # If binwidth or bincount is specified, discretize first
+    discretized_voxels = if binwidth !== nothing || bincount !== nothing
+        disc_result = discretize_voxels(voxels; binwidth=binwidth, bincount=bincount)
+        Float64.(disc_result.discretized)
+    else
+        voxels  # Use raw voxels if no discretization specified
+    end
 
     # Compute all features
     return Dict{String, Float64}(
         "Energy" => energy(voxels; shift=shift),
         "TotalEnergy" => total_energy(voxels, voxel_volume; shift=shift),
-        "Entropy" => entropy(voxels),
+        "Entropy" => entropy(discretized_voxels),  # Uses discretized values
         "Minimum" => fo_minimum(voxels),
         "10Percentile" => percentile_10(voxels),
         "90Percentile" => percentile_90(voxels),
@@ -954,7 +965,7 @@ function extract_firstorder(image::AbstractArray{T, N}, mask::AbstractArray;
         "Skewness" => skewness(voxels),
         "Kurtosis" => kurtosis(voxels),
         "Variance" => fo_variance(voxels),
-        "Uniformity" => uniformity(voxels)
+        "Uniformity" => uniformity(discretized_voxels)  # Uses discretized values
     )
 end
 

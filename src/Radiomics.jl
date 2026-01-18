@@ -34,7 +34,7 @@ using Meshing
 using GeometryBasics
 
 # Package version
-const VERSION = v"0.1.0"
+const VERSION = v"1.0.0"
 
 # Core types
 include("types.jl")

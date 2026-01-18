@@ -236,10 +236,13 @@ function _extract_firstorder_features!(
     spacing::NTuple
 )
     voxel_vol = prod(spacing)
+    # Pass binwidth/bincount for proper entropy/uniformity discretization
     fo_features = extract_firstorder(image, mask;
         label=1,
         shift=settings.voxel_array_shift,
-        voxel_volume=voxel_vol
+        voxel_volume=voxel_vol,
+        binwidth=settings.binwidth,
+        bincount=settings.bincount
     )
     for (name, value) in fo_features
         features["firstorder_$name"] = value
@@ -744,7 +747,7 @@ Return the number of features in a feature class.
 function feature_count(class::FeatureClass)
     counts = Dict(
         FirstOrder => 19,
-        Shape => 18,  # Mix of 2D (10) and 3D (18) - use max
+        Shape => 17,  # 3D has 17 features, 2D has 10 features
         GLCM => 24,
         GLRLM => 16,
         GLSZM => 16,
@@ -763,7 +766,7 @@ function total_feature_count(extractor::RadiomicsFeatureExtractor; is_3d::Bool=t
     total = 0
     for class in extractor.enabled_classes
         if class == Shape
-            total += is_3d ? 18 : 10
+            total += is_3d ? 17 : 10
         else
             total += feature_count(class)
         end

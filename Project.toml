@@ -1,7 +1,7 @@
 name = "Radiomics"
 uuid = "b38db8b5-554a-48bd-b1c6-be05a0ff3d6d"
 authors = ["Dale Black"]
-version = "0.1.0"
+version = "1.0.0"
 
 [deps]
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
@@ -11,6 +11,9 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+GeometryBasics = "0.5"
+Meshing = "0.7"
+StatsBase = "0.34"
 julia = "1.10"
 
 [extras]

@@ -63,9 +63,11 @@ include("glrlm.jl")
 # Gray Level Size Zone Matrix (GLSZM) features
 include("glszm.jl")
 
+# Neighbouring Gray Tone Difference Matrix (NGTDM) features
+include("ngtdm.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("ngtdm.jl")
 # include("gldm.jl")
 # include("extractor.jl")
 
@@ -178,5 +180,11 @@ export glszm_large_area_low_gray_level_emphasis, glszm_large_area_high_gray_leve
 # Export GLSZM extraction functions
 export extract_glszm, extract_glszm_to_featureset!
 export glszm_feature_names, glszm_ibsi_features
+
+# Export NGTDM computation functions and types
+export NGTDMResult, NGTDMResult2D
+export compute_ngtdm, compute_ngtdm_2d
+export ngtdm_num_gray_levels, ngtdm_num_valid_gray_levels
+export ngtdm_num_valid_voxels, ngtdm_sum_s
 
 end # module Radiomics

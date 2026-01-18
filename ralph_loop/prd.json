@@ -6,76 +6,133 @@
   "updated": "2026-01-17",
   "repository": "https://github.com/daleblack/Radiomics.jl",
   "reference": "https://github.com/AIM-Harvard/pyradiomics",
-
   "overview": {
     "goal": "Port PyRadiomics to pure Julia with guaranteed parity via exhaustive 1:1 unit testing",
     "approach": "Research-first development with PythonCall.jl test harness for validation",
     "testingStrategy": "Every PyRadiomics function tested against Julia implementation using deterministic random arrays"
   },
-
   "phases": {
     "phase1": {
       "name": "Deep Research",
       "description": "Comprehensive research on PyRadiomics architecture, Julia porting patterns, and dependency strategy",
-      "stories": ["RESEARCH-PYRADIOMICS-ARCH", "RESEARCH-PYRADIOMICS-FEATURES", "RESEARCH-JULIA-PORTING", "RESEARCH-DEPENDENCIES", "RESEARCH-TEST-STRATEGY"]
+      "stories": [
+        "RESEARCH-PYRADIOMICS-ARCH",
+        "RESEARCH-PYRADIOMICS-FEATURES",
+        "RESEARCH-JULIA-PORTING",
+        "RESEARCH-DEPENDENCIES",
+        "RESEARCH-TEST-STRATEGY"
+      ]
     },
     "phase2": {
       "name": "Package Setup",
       "description": "Initialize Julia package with proper structure, CI, and test harness",
-      "stories": ["SETUP-PACKAGE", "SETUP-GIT-REPO", "SETUP-CI", "SETUP-TEST-HARNESS"]
+      "stories": [
+        "SETUP-PACKAGE",
+        "SETUP-GIT-REPO",
+        "SETUP-CI",
+        "SETUP-TEST-HARNESS"
+      ]
     },
     "phase3": {
       "name": "Core Infrastructure",
       "description": "Implement core types, image handling, and mask operations",
-      "stories": ["IMPL-CORE-TYPES", "IMPL-IMAGE-HANDLING", "IMPL-MASK-OPERATIONS", "IMPL-DISCRETIZATION", "TEST-CORE-INFRASTRUCTURE"]
+      "stories": [
+        "IMPL-CORE-TYPES",
+        "IMPL-IMAGE-HANDLING",
+        "IMPL-MASK-OPERATIONS",
+        "IMPL-DISCRETIZATION",
+        "TEST-CORE-INFRASTRUCTURE"
+      ]
     },
     "phase4": {
       "name": "First Order Features",
       "description": "Implement first-order statistical features with full test coverage",
-      "stories": ["RESEARCH-FIRSTORDER-DETAILS", "IMPL-FIRSTORDER", "TEST-FIRSTORDER-PARITY"]
+      "stories": [
+        "RESEARCH-FIRSTORDER-DETAILS",
+        "IMPL-FIRSTORDER",
+        "TEST-FIRSTORDER-PARITY"
+      ]
     },
     "phase5": {
       "name": "Shape Features",
       "description": "Implement 2D and 3D shape features",
-      "stories": ["RESEARCH-SHAPE-DETAILS", "IMPL-SHAPE-2D", "IMPL-SHAPE-3D", "TEST-SHAPE-PARITY"]
+      "stories": [
+        "RESEARCH-SHAPE-DETAILS",
+        "IMPL-SHAPE-2D",
+        "IMPL-SHAPE-3D",
+        "TEST-SHAPE-PARITY"
+      ]
     },
     "phase6": {
       "name": "GLCM Features",
       "description": "Gray Level Co-occurrence Matrix texture features",
-      "stories": ["RESEARCH-GLCM-DETAILS", "IMPL-GLCM-MATRIX", "IMPL-GLCM-FEATURES", "TEST-GLCM-PARITY"]
+      "stories": [
+        "RESEARCH-GLCM-DETAILS",
+        "IMPL-GLCM-MATRIX",
+        "IMPL-GLCM-FEATURES",
+        "TEST-GLCM-PARITY"
+      ]
     },
     "phase7": {
       "name": "GLRLM Features",
       "description": "Gray Level Run Length Matrix features",
-      "stories": ["RESEARCH-GLRLM-DETAILS", "IMPL-GLRLM-MATRIX", "IMPL-GLRLM-FEATURES", "TEST-GLRLM-PARITY"]
+      "stories": [
+        "RESEARCH-GLRLM-DETAILS",
+        "IMPL-GLRLM-MATRIX",
+        "IMPL-GLRLM-FEATURES",
+        "TEST-GLRLM-PARITY"
+      ]
     },
     "phase8": {
       "name": "GLSZM Features",
       "description": "Gray Level Size Zone Matrix features",
-      "stories": ["RESEARCH-GLSZM-DETAILS", "IMPL-GLSZM-MATRIX", "IMPL-GLSZM-FEATURES", "TEST-GLSZM-PARITY"]
+      "stories": [
+        "RESEARCH-GLSZM-DETAILS",
+        "IMPL-GLSZM-MATRIX",
+        "IMPL-GLSZM-FEATURES",
+        "TEST-GLSZM-PARITY"
+      ]
     },
     "phase9": {
       "name": "NGTDM Features",
       "description": "Neighboring Gray Tone Difference Matrix features",
-      "stories": ["RESEARCH-NGTDM-DETAILS", "IMPL-NGTDM-MATRIX", "IMPL-NGTDM-FEATURES", "TEST-NGTDM-PARITY"]
+      "stories": [
+        "RESEARCH-NGTDM-DETAILS",
+        "IMPL-NGTDM-MATRIX",
+        "IMPL-NGTDM-FEATURES",
+        "TEST-NGTDM-PARITY"
+      ]
     },
     "phase10": {
       "name": "GLDM Features",
       "description": "Gray Level Dependence Matrix features",
-      "stories": ["RESEARCH-GLDM-DETAILS", "IMPL-GLDM-MATRIX", "IMPL-GLDM-FEATURES", "TEST-GLDM-PARITY"]
+      "stories": [
+        "RESEARCH-GLDM-DETAILS",
+        "IMPL-GLDM-MATRIX",
+        "IMPL-GLDM-FEATURES",
+        "TEST-GLDM-PARITY"
+      ]
     },
     "phase11": {
       "name": "Integration & API",
       "description": "High-level API, feature extraction pipeline, and integration tests",
-      "stories": ["IMPL-FEATURE-EXTRACTOR", "IMPL-HIGH-LEVEL-API", "TEST-INTEGRATION", "TEST-FULL-PARITY"]
+      "stories": [
+        "IMPL-FEATURE-EXTRACTOR",
+        "IMPL-HIGH-LEVEL-API",
+        "TEST-INTEGRATION",
+        "TEST-FULL-PARITY"
+      ]
     },
     "phase12": {
       "name": "Documentation & Release",
       "description": "Documentation, examples, and release preparation",
-      "stories": ["DOCS-API", "DOCS-EXAMPLES", "FINALIZE-RELEASE"]
+      "stories": [
+        "DOCS-API",
+        "DOCS-EXAMPLES",
+        "FINALIZE-RELEASE"
+      ]
     }
   },
-
   "userStories": [
     {
       "id": "RESEARCH-PYRADIOMICS-ARCH",
@@ -116,7 +173,9 @@
         "Create a complete feature inventory table",
         "Total count of features to implement documented"
       ],
-      "blockedBy": ["RESEARCH-PYRADIOMICS-ARCH"],
+      "blockedBy": [
+        "RESEARCH-PYRADIOMICS-ARCH"
+      ],
       "estimatedComplexity": "high",
       "references": [
         "https://pyradiomics.readthedocs.io/en/latest/features.html",
@@ -139,7 +198,9 @@
         "Document multiple dispatch patterns for feature classes",
         "Research Julia testing best practices (Test.jl patterns)"
       ],
-      "blockedBy": ["RESEARCH-PYRADIOMICS-ARCH"],
+      "blockedBy": [
+        "RESEARCH-PYRADIOMICS-ARCH"
+      ],
       "estimatedComplexity": "medium",
       "references": [
         "https://docs.julialang.org/en/v1/",
@@ -162,7 +223,9 @@
         "Verify all dependencies are pure Julia (no binary wrappers)",
         "Create proposed Project.toml dependencies section"
       ],
-      "blockedBy": ["RESEARCH-PYRADIOMICS-FEATURES"],
+      "blockedBy": [
+        "RESEARCH-PYRADIOMICS-FEATURES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -182,7 +245,9 @@
         "Create template test structure for feature parity tests",
         "Document CI strategy for running Python+Julia tests"
       ],
-      "blockedBy": ["RESEARCH-DEPENDENCIES"],
+      "blockedBy": [
+        "RESEARCH-DEPENDENCIES"
+      ],
       "estimatedComplexity": "medium",
       "references": [
         "https://github.com/JuliaPy/PythonCall.jl",
@@ -206,7 +271,9 @@
         "Create basic README.md with project description",
         "Package loads without errors: using Radiomics"
       ],
-      "blockedBy": ["RESEARCH-TEST-STRATEGY"],
+      "blockedBy": [
+        "RESEARCH-TEST-STRATEGY"
+      ],
       "estimatedComplexity": "low",
       "references": []
     },
@@ -223,7 +290,9 @@
         "Set up conventional commit message format",
         "Verify git status shows clean working tree"
       ],
-      "blockedBy": ["SETUP-PACKAGE"],
+      "blockedBy": [
+        "SETUP-PACKAGE"
+      ],
       "estimatedComplexity": "low",
       "references": []
     },
@@ -241,7 +310,9 @@
         "CI runs tests successfully",
         "Add CI badge to README.md"
       ],
-      "blockedBy": ["SETUP-GIT-REPO"],
+      "blockedBy": [
+        "SETUP-GIT-REPO"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -261,7 +332,9 @@
         "Document test harness usage in test file comments",
         "Commit test harness with descriptive message"
       ],
-      "blockedBy": ["SETUP-CI"],
+      "blockedBy": [
+        "SETUP-CI"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -281,7 +354,9 @@
         "Types follow Julia naming conventions",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["SETUP-TEST-HARNESS"],
+      "blockedBy": [
+        "SETUP-TEST-HARNESS"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -300,7 +375,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-CORE-TYPES"],
+      "blockedBy": [
+        "IMPL-CORE-TYPES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -319,7 +396,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-IMAGE-HANDLING"],
+      "blockedBy": [
+        "IMPL-IMAGE-HANDLING"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -338,7 +417,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-MASK-OPERATIONS"],
+      "blockedBy": [
+        "IMPL-MASK-OPERATIONS"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -357,7 +438,9 @@
         "Document any intentional differences",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-DISCRETIZATION"],
+      "blockedBy": [
+        "IMPL-DISCRETIZATION"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -375,7 +458,9 @@
         "Document edge case handling",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-CORE-INFRASTRUCTURE"],
+      "blockedBy": [
+        "TEST-CORE-INFRASTRUCTURE"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -409,7 +494,9 @@
         "Export all feature functions",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-FIRSTORDER-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-FIRSTORDER-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -428,7 +515,9 @@
         "Document tolerance thresholds used",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-FIRSTORDER"],
+      "blockedBy": [
+        "IMPL-FIRSTORDER"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -447,7 +536,9 @@
         "Identify mesh library dependencies",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-FIRSTORDER-PARITY"],
+      "blockedBy": [
+        "TEST-FIRSTORDER-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -470,7 +561,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-SHAPE-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-SHAPE-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -502,7 +595,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-SHAPE-2D"],
+      "blockedBy": [
+        "IMPL-SHAPE-2D"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -520,7 +615,9 @@
         "All tests pass within tolerance",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-SHAPE-3D"],
+      "blockedBy": [
+        "IMPL-SHAPE-3D"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -538,7 +635,9 @@
         "Document aggregation methods (average, merge)",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-SHAPE-PARITY"],
+      "blockedBy": [
+        "TEST-SHAPE-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -558,7 +657,9 @@
         "Handle discretized input correctly",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-GLCM-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-GLCM-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -596,7 +697,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLCM-MATRIX"],
+      "blockedBy": [
+        "IMPL-GLCM-MATRIX"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -615,7 +718,9 @@
         "All tests pass within tolerance",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLCM-FEATURES"],
+      "blockedBy": [
+        "IMPL-GLCM-FEATURES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -633,7 +738,9 @@
         "Document aggregation methods",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-GLCM-PARITY"],
+      "blockedBy": [
+        "TEST-GLCM-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -651,7 +758,9 @@
         "Handle masked regions correctly",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-GLRLM-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-GLRLM-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -681,7 +790,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLRLM-MATRIX"],
+      "blockedBy": [
+        "IMPL-GLRLM-MATRIX"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -698,7 +809,9 @@
         "All tests pass within tolerance",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLRLM-FEATURES"],
+      "blockedBy": [
+        "IMPL-GLRLM-FEATURES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -715,7 +828,9 @@
         "List all GLSZM features with formulas",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-GLRLM-PARITY"],
+      "blockedBy": [
+        "TEST-GLRLM-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -733,7 +848,9 @@
         "Support configurable connectivity",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-GLSZM-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-GLSZM-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -763,7 +880,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLSZM-MATRIX"],
+      "blockedBy": [
+        "IMPL-GLSZM-MATRIX"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -780,7 +899,9 @@
         "All tests pass within tolerance",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLSZM-FEATURES"],
+      "blockedBy": [
+        "IMPL-GLSZM-FEATURES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -797,7 +918,9 @@
         "List all NGTDM features with formulas",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-GLSZM-PARITY"],
+      "blockedBy": [
+        "TEST-GLSZM-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -815,7 +938,9 @@
         "Support configurable neighborhood distance",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-NGTDM-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-NGTDM-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -834,7 +959,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-NGTDM-MATRIX"],
+      "blockedBy": [
+        "IMPL-NGTDM-MATRIX"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -851,7 +978,9 @@
         "All tests pass within tolerance",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-NGTDM-FEATURES"],
+      "blockedBy": [
+        "IMPL-NGTDM-FEATURES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -868,7 +997,9 @@
         "List all GLDM features with formulas",
         "Create implementation checklist in progress.md"
       ],
-      "blockedBy": ["TEST-NGTDM-PARITY"],
+      "blockedBy": [
+        "TEST-NGTDM-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -886,7 +1017,9 @@
         "Support configurable neighborhood distance",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["RESEARCH-GLDM-DETAILS"],
+      "blockedBy": [
+        "RESEARCH-GLDM-DETAILS"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -914,7 +1047,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLDM-MATRIX"],
+      "blockedBy": [
+        "IMPL-GLDM-MATRIX"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -931,7 +1066,9 @@
         "All tests pass within tolerance",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-GLDM-FEATURES"],
+      "blockedBy": [
+        "IMPL-GLDM-FEATURES"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -940,7 +1077,7 @@
       "title": "Implement Feature Extractor Class",
       "description": "Create unified feature extraction interface",
       "priority": 42,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/extractor.jl module",
         "Implement RadiomicsFeatureExtractor struct",
@@ -951,7 +1088,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["TEST-GLDM-PARITY"],
+      "blockedBy": [
+        "TEST-GLDM-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -970,7 +1109,9 @@
         "All functions have docstrings",
         "Commit with descriptive message"
       ],
-      "blockedBy": ["IMPL-FEATURE-EXTRACTOR"],
+      "blockedBy": [
+        "IMPL-FEATURE-EXTRACTOR"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -989,7 +1130,9 @@
         "Verify memory efficiency (no leaks)",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["IMPL-HIGH-LEVEL-API"],
+      "blockedBy": [
+        "IMPL-HIGH-LEVEL-API"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -1011,7 +1154,9 @@
         "All tests pass",
         "Commit test file with descriptive message"
       ],
-      "blockedBy": ["TEST-INTEGRATION"],
+      "blockedBy": [
+        "TEST-INTEGRATION"
+      ],
       "estimatedComplexity": "high",
       "references": []
     },
@@ -1030,7 +1175,9 @@
         "Add mathematical formulas to docstrings",
         "Commit documentation with descriptive message"
       ],
-      "blockedBy": ["TEST-FULL-PARITY"],
+      "blockedBy": [
+        "TEST-FULL-PARITY"
+      ],
       "estimatedComplexity": "medium",
       "references": []
     },
@@ -1048,7 +1195,9 @@
         "All examples run without errors",
         "Commit examples with descriptive message"
       ],
-      "blockedBy": ["DOCS-API"],
+      "blockedBy": [
+        "DOCS-API"
+      ],
       "estimatedComplexity": "low",
       "references": []
     },
@@ -1068,12 +1217,13 @@
         "Package ready for Julia General Registry",
         "Final commit with release notes"
       ],
-      "blockedBy": ["DOCS-EXAMPLES"],
+      "blockedBy": [
+        "DOCS-EXAMPLES"
+      ],
       "estimatedComplexity": "low",
       "references": []
     }
   ],
-
   "completionSummary": {
     "totalStories": 48,
     "phases": 12,

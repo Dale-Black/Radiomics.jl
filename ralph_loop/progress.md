@@ -8510,3 +8510,150 @@ TEST-GLDM-PARITY: Add GLDM parity tests and fix j-indexing
 ```
 
 ---
+
+### Iteration 43 - 2026-01-17 17:16:06
+
+**Agent started** (Open: 7, Done: 41)
+
+
+### Iteration 43 - 2026-01-17
+
+**Story**: IMPL-FEATURE-EXTRACTOR
+**Status**: ✅ COMPLETED
+
+---
+
+## Feature Extractor Implementation
+
+### Summary
+
+Created `src/extractor.jl` implementing the RadiomicsFeatureExtractor struct, providing a unified 
+interface for extracting all radiomic features from medical images.
+
+### Key Components
+
+#### 1. FeatureClass Enumeration
+
+```julia
+@enum FeatureClass begin
+    FirstOrder
+    Shape
+    GLCM
+    GLRLM
+    GLSZM
+    NGTDM
+    GLDM
+end
+```
+
+#### 2. RadiomicsFeatureExtractor Struct
+
+```julia
+mutable struct RadiomicsFeatureExtractor
+    enabled_classes::Set{FeatureClass}
+    settings::Settings
+end
+```
+
+#### 3. Main Functions
+
+| Function | Description |
+|----------|-------------|
+| `RadiomicsFeatureExtractor()` | Create extractor with all features enabled |
+| `extract(extractor, image, mask)` | Extract features, returns Dict{String, Float64} |
+| `enable!(extractor, class)` | Enable a feature class |
+| `disable!(extractor, class)` | Disable a feature class |
+| `is_enabled(extractor, class)` | Check if class is enabled |
+| `enabled_classes(extractor)` | List enabled classes |
+
+#### 4. Convenience Functions
+
+| Function | Description |
+|----------|-------------|
+| `extract_all(image, mask; kwargs...)` | Extract all features with settings |
+| `extract_firstorder_only(image, mask)` | Extract only first-order features |
+| `extract_shape_only(mask)` | Extract only shape features |
+| `extract_texture_only(image, mask)` | Extract GLCM, GLRLM, GLSZM, NGTDM, GLDM |
+| `feature_count(class)` | Number of features in a class |
+| `feature_names(class)` | List of feature names |
+
+### Feature Counts
+
+| Class | Features |
+|-------|----------|
+| FirstOrder | 19 |
+| Shape (3D) | 18 |
+| Shape (2D) | 10 |
+| GLCM | 24 |
+| GLRLM | 16 |
+| GLSZM | 16 |
+| NGTDM | 5 |
+| GLDM | 14 |
+| **Total (3D)** | **112** |
+
+### Usage Example
+
+```julia
+using Radiomics
+
+# Create extractor
+extractor = RadiomicsFeatureExtractor()
+
+# Or with specific classes
+extractor = RadiomicsFeatureExtractor(enabled_classes=Set([FirstOrder, GLCM]))
+
+# Or with custom settings
+extractor = RadiomicsFeatureExtractor(settings=Settings(binwidth=32.0))
+
+# Extract features
+image = rand(64, 64, 64)
+mask = image .> 0.5
+features = extract(extractor, image, mask)
+
+# Access results
+println(features["firstorder_Energy"])
+println(features["glcm_Contrast"])
+```
+
+### Files Created
+
+- **src/extractor.jl** - 695 lines implementing the feature extractor
+
+### Files Modified
+
+- **src/Radiomics.jl** - Added include and exports for extractor
+
+### Test Results
+
+```julia
+# Basic tests passed:
+# - Module loading: ✅
+# - Default extractor creation: ✅
+# - Enable/disable feature classes: ✅
+# - Custom settings: ✅
+# - 3D feature extraction: ✅ (111 features)
+# - 2D feature extraction: ✅ (29 features)
+
+# Full test suite: 1436 tests pass
+```
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| Create src/extractor.jl module | ✅ |
+| Implement RadiomicsFeatureExtractor struct | ✅ |
+| Support enabling/disabling feature classes | ✅ |
+| Support configurable settings (binning, etc.) | ✅ |
+| Implement extract(extractor, image, mask) function | ✅ |
+| Return Dict or NamedTuple of all features | ✅ (Dict) |
+| All functions have docstrings | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Git Commit
+
+```
+IMPL-FEATURE-EXTRACTOR: Implement unified feature extraction interface
+```
+
+---

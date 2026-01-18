@@ -8309,3 +8309,103 @@ IMPL-GLDM-MATRIX: Implement GLDM matrix computation
 
 ---
 
+
+### Iteration 41 - 2026-01-17
+
+**Story**: IMPL-GLDM-FEATURES
+**Status**: ✅ COMPLETED
+
+---
+
+## GLDM Features Implementation
+
+### Summary
+
+Implemented all 14 GLDM (Gray Level Dependence Matrix) texture features in `src/gldm.jl`. These features quantify texture by measuring how voxels with similar gray levels are distributed in terms of their dependence relationships.
+
+### Files Modified
+
+- **Modified**: `src/gldm.jl` - Added 14 feature functions (~600 lines)
+- **Modified**: `src/Radiomics.jl` - Added exports for all 14 feature functions
+
+### Features Implemented (14 total)
+
+| # | Feature Name | Function | IBSI Code |
+|---|--------------|----------|-----------|
+| 1 | Small Dependence Emphasis | `gldm_small_dependence_emphasis` | SODN |
+| 2 | Large Dependence Emphasis | `gldm_large_dependence_emphasis` | IANU |
+| 3 | Gray Level Non-Uniformity | `gldm_gray_level_non_uniformity` | FP8K |
+| 4 | Dependence Non-Uniformity | `gldm_dependence_non_uniformity` | Z87G |
+| 5 | Dependence Non-Uniformity Normalized | `gldm_dependence_non_uniformity_normalized` | OKJI |
+| 6 | Gray Level Variance | `gldm_gray_level_variance` | QK93 |
+| 7 | Dependence Variance | `gldm_dependence_variance` | 7162 |
+| 8 | Dependence Entropy | `gldm_dependence_entropy` | GBDU |
+| 9 | Low Gray Level Emphasis | `gldm_low_gray_level_emphasis` | 5W23 |
+| 10 | High Gray Level Emphasis | `gldm_high_gray_level_emphasis` | DHV0 |
+| 11 | Small Dependence Low Gray Level Emphasis | `gldm_small_dependence_low_gray_level_emphasis` | RUVG |
+| 12 | Small Dependence High Gray Level Emphasis | `gldm_small_dependence_high_gray_level_emphasis` | DKNJ |
+| 13 | Large Dependence Low Gray Level Emphasis | `gldm_large_dependence_low_gray_level_emphasis` | A7WM |
+| 14 | Large Dependence High Gray Level Emphasis | `gldm_large_dependence_high_gray_level_emphasis` | KLTH |
+
+### Key Implementation Details
+
+1. **Dependence Size Indexing**
+   - GLDM matrix columns represent dependence counts from 0 to max_dependence
+   - Column j corresponds to dependence count (j-1) due to 1-based indexing
+   - Features that use j² skip dependence count 0 to avoid division by zero
+
+2. **Formula Patterns**
+   - Emphasis features: Weight by 1/j² (small) or j² (large)
+   - Non-uniformity: Sum of squared marginals divided by Nz
+   - Variance: Uses normalized matrix p(i,j) = P(i,j)/Nz
+   - Entropy: -Σ p(i,j) × log₂(p(i,j) + ε)
+
+3. **Consistency with Other Matrices**
+   - Feature naming follows same pattern as GLSZM/GLRLM
+   - All features handle Nz=0 edge case by returning NaN
+   - Uses GLDM_EPSILON constant for log calculations
+
+### Test Results
+
+```julia
+# All 14 features compute successfully
+image = rand(1:10, 20, 20, 20)
+mask = trues(20, 20, 20)
+result = compute_gldm(image, mask; alpha=0)
+
+# Sample outputs:
+# SmallDependenceEmphasis = 0.3208
+# LargeDependenceEmphasis = 7.8413
+# DependenceEntropy = 5.8960
+
+# All 1436 existing tests pass
+```
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| Implement SmallDependenceEmphasis | ✅ |
+| Implement LargeDependenceEmphasis | ✅ |
+| Implement GrayLevelNonUniformity | ✅ |
+| Implement DependenceNonUniformity | ✅ |
+| Implement DependenceNonUniformityNormalized | ✅ |
+| Implement GrayLevelVariance | ✅ |
+| Implement DependenceVariance | ✅ |
+| Implement DependenceEntropy | ✅ |
+| Implement LowGrayLevelEmphasis | ✅ |
+| Implement HighGrayLevelEmphasis | ✅ |
+| Implement SmallDependenceLowGrayLevelEmphasis | ✅ |
+| Implement SmallDependenceHighGrayLevelEmphasis | ✅ |
+| Implement LargeDependenceLowGrayLevelEmphasis | ✅ |
+| Implement LargeDependenceHighGrayLevelEmphasis | ✅ |
+| All functions have docstrings | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Git Commit
+
+```
+IMPL-GLDM-FEATURES: Implement all 14 GLDM texture features
+```
+
+---

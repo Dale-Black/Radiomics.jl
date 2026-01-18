@@ -534,3 +534,614 @@ Get the vector of dependence sizes present in the ROI.
 """
 gldm_dependence_sizes(result::GLDMResult) = result.jvector
 gldm_dependence_sizes(result::GLDMResult2D) = result.jvector
+
+#==============================================================================#
+# GLDM Features - Dependence Emphasis Features (1-2)
+#==============================================================================#
+
+"""
+    gldm_small_dependence_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Small Dependence Emphasis (SDE): Measures the distribution of small dependencies.
+
+# Mathematical Formula
+```
+SDE = (1/Nz) × Σᵢ Σⱼ P(i,j) / j²
+```
+
+where:
+- P(i,j) is the GLDM matrix (gray level i, dependence count j)
+- Nz is the total number of voxels (zones)
+- j is the dependence size (1-indexed for column j, representing dependence count j-1)
+
+Higher values indicate smaller dependence and less homogeneous textures.
+
+# Notes
+- The jvector in the result contains the actual dependence values (0-indexed)
+- Column index j in the matrix corresponds to dependence value j-1
+
+# References
+- PyRadiomics: gldm.py:getSmallDependenceEmphasisFeatureValue
+- IBSI Code: SODN
+"""
+function gldm_small_dependence_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    max_dep = result.max_dependence
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:(max_dep + 1)
+        # Column j corresponds to dependence count (j-1)
+        # For SDE, we use j² where j is the dependence count
+        # Dependence count 0 would give division by 0, so we skip it
+        dep_count = j - 1  # Actual dependence count (0-indexed)
+        if dep_count == 0
+            # For dependence count 0, j² = 0, skip (or use 1 to avoid div by zero)
+            # PyRadiomics uses actual j values starting from 0
+            # Looking at IBSI/PyRadiomics: j goes from 1 to Nd (number of dependences)
+            # Actually, PyRadiomics jvector contains the actual dependence sizes present
+            # and they start indexing from those values
+            # Let's handle 0 dependence specially
+            continue
+        end
+        j_sq = dep_count * dep_count
+        for i in 1:Ng
+            total += P[i, j] / j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_large_dependence_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Large Dependence Emphasis (LDE): Measures the distribution of large dependencies.
+
+# Mathematical Formula
+```
+LDE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j²
+```
+
+Higher values indicate larger dependence and more homogeneous textures.
+
+# References
+- PyRadiomics: gldm.py:getLargeDependenceEmphasisFeatureValue
+- IBSI Code: IANU
+"""
+function gldm_large_dependence_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    max_dep = result.max_dependence
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:(max_dep + 1)
+        dep_count = j - 1  # Actual dependence count
+        j_sq = dep_count * dep_count
+        for i in 1:Ng
+            total += P[i, j] * j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+#==============================================================================#
+# GLDM Features - Non-Uniformity Features (3-5)
+#==============================================================================#
+
+"""
+    gldm_gray_level_non_uniformity(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Gray Level Non-Uniformity (GLN): Measures variability of gray level intensity.
+
+# Mathematical Formula
+```
+GLN = (1/Nz) × Σᵢ (Σⱼ P(i,j))²
+```
+
+Lower values indicate more homogeneous gray level distribution.
+
+# References
+- PyRadiomics: gldm.py:getGrayLevelNonUniformityFeatureValue
+- IBSI Code: FP8K
+"""
+function gldm_gray_level_non_uniformity(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # pg(i) = Σⱼ P(i,j)
+    total = 0.0
+    @inbounds for i in 1:Ng
+        pg_i = 0.0
+        for j in 1:Nd
+            pg_i += P[i, j]
+        end
+        total += pg_i * pg_i
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_dependence_non_uniformity(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Dependence Non-Uniformity (DN): Measures variability of dependence sizes.
+
+# Mathematical Formula
+```
+DN = (1/Nz) × Σⱼ (Σᵢ P(i,j))²
+```
+
+Lower values indicate more homogeneous dependence size distribution.
+
+# References
+- PyRadiomics: gldm.py:getDependenceNonUniformityFeatureValue
+- IBSI Code: Z87G
+"""
+function gldm_dependence_non_uniformity(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # pd(j) = Σᵢ P(i,j)
+    total = 0.0
+    @inbounds for j in 1:Nd
+        pd_j = 0.0
+        for i in 1:Ng
+            pd_j += P[i, j]
+        end
+        total += pd_j * pd_j
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_dependence_non_uniformity_normalized(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Dependence Non-Uniformity Normalized (DNN): Normalized measure of dependence size variability.
+
+# Mathematical Formula
+```
+DNN = (1/Nz²) × Σⱼ (Σᵢ P(i,j))²
+```
+
+Similar to DN but normalized by Nz², making it more comparable across different images.
+
+# References
+- PyRadiomics: gldm.py:getDependenceNonUniformityNormalizedFeatureValue
+- IBSI Code: OKJI
+"""
+function gldm_dependence_non_uniformity_normalized(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # pd(j) = Σᵢ P(i,j)
+    total = 0.0
+    @inbounds for j in 1:Nd
+        pd_j = 0.0
+        for i in 1:Ng
+            pd_j += P[i, j]
+        end
+        total += pd_j * pd_j
+    end
+
+    return total / (Nz * Nz)
+end
+
+#==============================================================================#
+# GLDM Features - Variance and Entropy Features (6-8)
+#==============================================================================#
+
+"""
+    gldm_gray_level_variance(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Gray Level Variance (GLV): Measures variance in gray level intensities.
+
+# Mathematical Formula
+```
+GLV = Σᵢ Σⱼ p(i,j) × (i - μᵢ)²
+```
+
+where:
+- p(i,j) = P(i,j) / Nz (normalized GLDM)
+- μᵢ = Σᵢ Σⱼ p(i,j) × i (mean gray level)
+
+# References
+- PyRadiomics: gldm.py:getGrayLevelVarianceFeatureValue
+- IBSI Code: QK93
+"""
+function gldm_gray_level_variance(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # Compute mean gray level μᵢ = Σᵢ Σⱼ p(i,j) × i
+    mu_i = 0.0
+    @inbounds for j in 1:Nd
+        for i in 1:Ng
+            mu_i += (P[i, j] / Nz) * i
+        end
+    end
+
+    # Compute variance
+    variance = 0.0
+    @inbounds for j in 1:Nd
+        for i in 1:Ng
+            p_ij = P[i, j] / Nz
+            variance += p_ij * (i - mu_i)^2
+        end
+    end
+
+    return variance
+end
+
+"""
+    gldm_dependence_variance(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Dependence Variance (DV): Measures variance in dependence sizes.
+
+# Mathematical Formula
+```
+DV = Σᵢ Σⱼ p(i,j) × (j - μⱼ)²
+```
+
+where:
+- p(i,j) = P(i,j) / Nz (normalized GLDM)
+- μⱼ = Σᵢ Σⱼ p(i,j) × j (mean dependence size)
+- j is the actual dependence count (0-indexed in the column)
+
+# References
+- PyRadiomics: gldm.py:getDependenceVarianceFeatureValue
+- IBSI Code: 7162
+"""
+function gldm_dependence_variance(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # Compute mean dependence size μⱼ = Σᵢ Σⱼ p(i,j) × j
+    # where j is the actual dependence count (column index - 1)
+    mu_j = 0.0
+    @inbounds for j in 1:Nd
+        dep_count = j - 1  # Actual dependence count
+        for i in 1:Ng
+            mu_j += (P[i, j] / Nz) * dep_count
+        end
+    end
+
+    # Compute variance
+    variance = 0.0
+    @inbounds for j in 1:Nd
+        dep_count = j - 1
+        for i in 1:Ng
+            p_ij = P[i, j] / Nz
+            variance += p_ij * (dep_count - mu_j)^2
+        end
+    end
+
+    return variance
+end
+
+"""
+    gldm_dependence_entropy(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Dependence Entropy (DE): Measures the randomness/heterogeneity of dependence distribution.
+
+# Mathematical Formula
+```
+DE = -Σᵢ Σⱼ p(i,j) × log₂(p(i,j) + ε)
+```
+
+where:
+- p(i,j) = P(i,j) / Nz (normalized GLDM)
+- ε ≈ 2.2×10⁻¹⁶ (machine epsilon to prevent log(0))
+
+Higher values indicate more heterogeneous distributions.
+
+# References
+- PyRadiomics: gldm.py:getDependenceEntropyFeatureValue
+- IBSI Code: GBDU
+"""
+function gldm_dependence_entropy(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    entropy = 0.0
+    @inbounds for j in 1:Nd
+        for i in 1:Ng
+            p_ij = P[i, j] / Nz
+            if p_ij > 0
+                entropy -= p_ij * log2(p_ij + GLDM_EPSILON)
+            end
+        end
+    end
+
+    return entropy
+end
+
+#==============================================================================#
+# GLDM Features - Gray Level Emphasis Features (9-10)
+#==============================================================================#
+
+"""
+    gldm_low_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Low Gray Level Emphasis (LGLE): Measures the distribution of lower gray levels.
+
+# Mathematical Formula
+```
+LGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) / i²
+```
+
+Higher values indicate a greater proportion of lower gray level values.
+
+# References
+- PyRadiomics: gldm.py:getLowGrayLevelEmphasisFeatureValue
+- IBSI Code: 5W23
+"""
+function gldm_low_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Nd
+        for i in 1:Ng
+            total += P[i, j] / (i * i)
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_high_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+High Gray Level Emphasis (HGLE): Measures the distribution of higher gray levels.
+
+# Mathematical Formula
+```
+HGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i²
+```
+
+Higher values indicate a greater proportion of higher gray level values.
+
+# References
+- PyRadiomics: gldm.py:getHighGrayLevelEmphasisFeatureValue
+- IBSI Code: DHV0
+"""
+function gldm_high_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Nd
+        for i in 1:Ng
+            total += P[i, j] * (i * i)
+        end
+    end
+
+    return total / Nz
+end
+
+#==============================================================================#
+# GLDM Features - Combined Emphasis Features (11-14)
+#==============================================================================#
+
+"""
+    gldm_small_dependence_low_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Small Dependence Low Gray Level Emphasis (SDLGLE): Measures the joint distribution
+of small dependencies and low gray levels.
+
+# Mathematical Formula
+```
+SDLGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) / (i² × j²)
+```
+
+Higher values indicate a greater proportion of small dependencies with low gray levels.
+
+# References
+- PyRadiomics: gldm.py:getSmallDependenceLowGrayLevelEmphasisFeatureValue
+- IBSI Code: RUVG
+"""
+function gldm_small_dependence_low_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Nd
+        dep_count = j - 1  # Actual dependence count
+        if dep_count == 0
+            continue  # Skip 0 dependence to avoid division by zero
+        end
+        j_sq = dep_count * dep_count
+        for i in 1:Ng
+            total += P[i, j] / (i * i * j_sq)
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_small_dependence_high_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Small Dependence High Gray Level Emphasis (SDHGLE): Measures the joint distribution
+of small dependencies and high gray levels.
+
+# Mathematical Formula
+```
+SDHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² / j²
+```
+
+Higher values indicate a greater proportion of small dependencies with high gray levels.
+
+# References
+- PyRadiomics: gldm.py:getSmallDependenceHighGrayLevelEmphasisFeatureValue
+- IBSI Code: DKNJ
+"""
+function gldm_small_dependence_high_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Nd
+        dep_count = j - 1
+        if dep_count == 0
+            continue  # Skip 0 dependence to avoid division by zero
+        end
+        j_sq = dep_count * dep_count
+        for i in 1:Ng
+            total += P[i, j] * (i * i) / j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_large_dependence_low_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Large Dependence Low Gray Level Emphasis (LDLGLE): Measures the joint distribution
+of large dependencies and low gray levels.
+
+# Mathematical Formula
+```
+LDLGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j² / i²
+```
+
+Higher values indicate a greater proportion of large dependencies with low gray levels.
+
+# References
+- PyRadiomics: gldm.py:getLargeDependenceLowGrayLevelEmphasisFeatureValue
+- IBSI Code: A7WM
+"""
+function gldm_large_dependence_low_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Nd
+        dep_count = j - 1
+        j_sq = dep_count * dep_count
+        for i in 1:Ng
+            total += P[i, j] * j_sq / (i * i)
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    gldm_large_dependence_high_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D}) -> Float64
+
+Large Dependence High Gray Level Emphasis (LDHGLE): Measures the joint distribution
+of large dependencies and high gray levels.
+
+# Mathematical Formula
+```
+LDHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² × j²
+```
+
+Higher values indicate a greater proportion of large dependencies with high gray levels.
+
+# References
+- PyRadiomics: gldm.py:getLargeDependenceHighGrayLevelEmphasisFeatureValue
+- IBSI Code: KLTH
+"""
+function gldm_large_dependence_high_gray_level_emphasis(result::Union{GLDMResult, GLDMResult2D})
+    P = result.P
+    Nz = result.Nz
+    Ng = size(P, 1)
+    Nd = size(P, 2)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Nd
+        dep_count = j - 1
+        j_sq = dep_count * dep_count
+        for i in 1:Ng
+            total += P[i, j] * (i * i) * j_sq
+        end
+    end
+
+    return total / Nz
+end

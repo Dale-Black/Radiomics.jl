@@ -895,7 +895,7 @@
       "title": "Implement GLDM Features",
       "description": "Implement all GLDM texture features",
       "priority": 40,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement SmallDependenceEmphasis",
         "Implement LargeDependenceEmphasis",

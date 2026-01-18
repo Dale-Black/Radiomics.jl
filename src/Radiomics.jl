@@ -202,4 +202,13 @@ export gldm_num_gray_levels, gldm_num_valid_gray_levels
 export gldm_num_zones, gldm_max_dependence
 export gldm_gray_levels, gldm_dependence_sizes
 
+# Export GLDM feature functions
+export gldm_small_dependence_emphasis, gldm_large_dependence_emphasis
+export gldm_gray_level_non_uniformity
+export gldm_dependence_non_uniformity, gldm_dependence_non_uniformity_normalized
+export gldm_gray_level_variance, gldm_dependence_variance, gldm_dependence_entropy
+export gldm_low_gray_level_emphasis, gldm_high_gray_level_emphasis
+export gldm_small_dependence_low_gray_level_emphasis, gldm_small_dependence_high_gray_level_emphasis
+export gldm_large_dependence_low_gray_level_emphasis, gldm_large_dependence_high_gray_level_emphasis
+
 end # module Radiomics

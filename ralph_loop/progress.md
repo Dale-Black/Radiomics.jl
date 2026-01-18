@@ -6841,3 +6841,94 @@ All features tested:
 | All functions have docstrings | ✅ |
 | Commit with descriptive message | ✅ |
 
+
+### Iteration 34 - 2026-01-17 16:10:44
+
+**Agent started** (Open: 16, Done: 32)
+
+
+---
+
+## Iteration 35: TEST-GLSZM-PARITY
+
+**Date**: 2026-01-17
+**Story**: TEST-GLSZM-PARITY - Test GLSZM Feature Parity
+**Status**: ✅ COMPLETED
+
+### Summary
+
+Created comprehensive parity tests for all 16 GLSZM (Gray Level Size Zone Matrix) features. All tests pass with 1:1 parity against PyRadiomics.
+
+### Files Created
+
+- `test/test_glszm.jl` - Complete GLSZM parity test suite (725 lines)
+
+### Files Modified
+
+- `test/runtests.jl` - Added include for test_glszm.jl
+
+### Test Structure
+
+The test file follows the established pattern from test_glrlm.jl:
+
+1. **Individual Feature Tests** - Each of the 16 features tested individually with multiple random seeds
+2. **Comprehensive Parity Tests** - All features tested together across multiple seeds and sizes
+3. **Discretization Settings** - Tests with different binwidth values (16, 25, 32, 64)
+4. **Edge Cases** - Small mask regions, high intensity values, integer images
+5. **Feature Consistency** - Mathematical relationship validation
+6. **2D Image Parity** - 2D GLSZM feature extraction tested against PyRadiomics
+7. **Summary Report** - Final comprehensive test with detailed reporting
+
+### Features Tested (All 16 GLSZM Features)
+
+| Feature | Julia Function | PyRadiomics Name |
+|---------|----------------|------------------|
+| 1. Small Area Emphasis | `glszm_small_area_emphasis` | SmallAreaEmphasis |
+| 2. Large Area Emphasis | `glszm_large_area_emphasis` | LargeAreaEmphasis |
+| 3. Gray Level Non-Uniformity | `glszm_gray_level_non_uniformity` | GrayLevelNonUniformity |
+| 4. Gray Level Non-Uniformity Normalized | `glszm_gray_level_non_uniformity_normalized` | GrayLevelNonUniformityNormalized |
+| 5. Size Zone Non-Uniformity | `glszm_size_zone_non_uniformity` | SizeZoneNonUniformity |
+| 6. Size Zone Non-Uniformity Normalized | `glszm_size_zone_non_uniformity_normalized` | SizeZoneNonUniformityNormalized |
+| 7. Zone Percentage | `glszm_zone_percentage` | ZonePercentage |
+| 8. Gray Level Variance | `glszm_gray_level_variance` | GrayLevelVariance |
+| 9. Zone Variance | `glszm_zone_variance` | ZoneVariance |
+| 10. Zone Entropy | `glszm_zone_entropy` | ZoneEntropy |
+| 11. Low Gray Level Zone Emphasis | `glszm_low_gray_level_zone_emphasis` | LowGrayLevelZoneEmphasis |
+| 12. High Gray Level Zone Emphasis | `glszm_high_gray_level_zone_emphasis` | HighGrayLevelZoneEmphasis |
+| 13. Small Area Low Gray Level Emphasis | `glszm_small_area_low_gray_level_emphasis` | SmallAreaLowGrayLevelEmphasis |
+| 14. Small Area High Gray Level Emphasis | `glszm_small_area_high_gray_level_emphasis` | SmallAreaHighGrayLevelEmphasis |
+| 15. Large Area Low Gray Level Emphasis | `glszm_large_area_low_gray_level_emphasis` | LargeAreaLowGrayLevelEmphasis |
+| 16. Large Area High Gray Level Emphasis | `glszm_large_area_high_gray_level_emphasis` | LargeAreaHighGrayLevelEmphasis |
+
+### Test Results
+
+```
+Test Summary:        | Pass  Total  Time
+GLSZM Feature Parity |   97     97  2.5s
+Comprehensive GLSZM Parity |   50     50  0.0s
+Discretization Settings    |   12     12  0.1s
+Edge Cases                 |   22     22  0.1s
+Feature Consistency        |   60     60  0.0s
+2D Image Parity           |    9      9  0.0s
+GLSZM Parity Summary      |    2      2  0.0s
+
+TOTAL: 252 tests passed
+```
+
+### Parity Summary
+
+- **Features Tested**: 16
+- **Features Passed**: 16
+- **Features Missing**: 0
+- **Features Failed**: 0
+- **Tolerance**: rtol=1e-10, atol=1e-12
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create test/test_glszm.jl | ✅ |
+| Test GLSZM matrix matches PyRadiomics | ✅ |
+| Test EVERY GLSZM feature against PyRadiomics | ✅ |
+| All tests pass within tolerance | ✅ |
+| Commit test file with descriptive message | ✅ |

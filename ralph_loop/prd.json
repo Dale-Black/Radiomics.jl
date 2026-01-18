@@ -772,7 +772,7 @@
       "title": "Test GLSZM Feature Parity",
       "description": "Verify all GLSZM features match PyRadiomics",
       "priority": 33,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_glszm.jl",
         "Test GLSZM matrix matches PyRadiomics",

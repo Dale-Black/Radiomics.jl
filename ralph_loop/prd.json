@@ -742,7 +742,7 @@
       "title": "Implement GLSZM Features",
       "description": "Implement all GLSZM texture features",
       "priority": 32,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement SmallAreaEmphasis",
         "Implement LargeAreaEmphasis",

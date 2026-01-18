@@ -6757,3 +6757,87 @@ All basic tests passed:
 
 **Agent started** (Open: 17, Done: 31)
 
+---
+
+## Iteration 34: IMPL-GLSZM-FEATURES
+
+**Date**: 2026-01-17
+**Story**: IMPL-GLSZM-FEATURES - Implement All 16 GLSZM Texture Features
+**Status**: ✅ COMPLETED
+
+### Summary
+
+Implemented all 16 Gray Level Size Zone Matrix (GLSZM) texture features. Unlike GLCM and GLRLM, GLSZM is rotation-independent - only one matrix is computed for the entire ROI.
+
+### Features Implemented
+
+#### Zone Size Emphasis Features
+1. **SmallAreaEmphasis (SAE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) / j²`
+2. **LargeAreaEmphasis (LAE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) × j²`
+
+#### Non-Uniformity Features
+3. **GrayLevelNonUniformity (GLN)**: `(1/Nz) × Σᵢ (Σⱼ P(i,j))²`
+4. **GrayLevelNonUniformityNormalized (GLNN)**: `(1/Nz²) × Σᵢ (Σⱼ P(i,j))²`
+5. **SizeZoneNonUniformity (SZN)**: `(1/Nz) × Σⱼ (Σᵢ P(i,j))²`
+6. **SizeZoneNonUniformityNormalized (SZNN)**: `(1/Nz²) × Σⱼ (Σᵢ P(i,j))²`
+
+#### Zone Statistics Features
+7. **ZonePercentage (ZP)**: `Nz / Np`
+8. **GrayLevelVariance (GLV)**: `Σᵢ Σⱼ p(i,j) × (i - μᵢ)²`
+9. **ZoneVariance (ZV)**: `Σᵢ Σⱼ p(i,j) × (j - μⱼ)²`
+10. **ZoneEntropy (ZE)**: `-Σᵢ Σⱼ p(i,j) × log₂(p(i,j) + ε)`
+
+#### Gray Level Emphasis Features
+11. **LowGrayLevelZoneEmphasis (LGLZE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) / i²`
+12. **HighGrayLevelZoneEmphasis (HGLZE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) × i²`
+
+#### Joint Emphasis Features
+13. **SmallAreaLowGrayLevelEmphasis (SALGLE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) / (i² × j²)`
+14. **SmallAreaHighGrayLevelEmphasis (SAHGLE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) × i² / j²`
+15. **LargeAreaLowGrayLevelEmphasis (LALGLE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) × j² / i²`
+16. **LargeAreaHighGrayLevelEmphasis (LAHGLE)**: `(1/Nz) × Σᵢ Σⱼ P(i,j) × i² × j²`
+
+### Files Modified
+
+- `src/glszm.jl` - Added ~850 lines for all 16 feature functions
+- `src/Radiomics.jl` - Added exports for GLSZM feature functions
+
+### Convenience Functions Added
+
+- `extract_glszm(result)` - Extract all 16 features from GLSZM result
+- `extract_glszm(image, mask; ...)` - One-step extraction from image/mask
+- `extract_glszm_to_featureset!()` - Add to FeatureSet
+- `glszm_feature_names()` - List all feature names
+- `glszm_ibsi_features()` - List IBSI-compliant features (all 16)
+
+### Verification
+
+All features tested:
+- Package loads without errors
+- All 16 feature functions compute values
+- extract_glszm() returns all 16 features
+- Convenience function works for both 2D and 3D
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Implement SmallAreaEmphasis | ✅ |
+| Implement LargeAreaEmphasis | ✅ |
+| Implement GrayLevelNonUniformity | ✅ |
+| Implement GrayLevelNonUniformityNormalized | ✅ |
+| Implement SizeZoneNonUniformity | ✅ |
+| Implement SizeZoneNonUniformityNormalized | ✅ |
+| Implement ZonePercentage | ✅ |
+| Implement GrayLevelVariance | ✅ |
+| Implement ZoneVariance | ✅ |
+| Implement ZoneEntropy | ✅ |
+| Implement LowGrayLevelZoneEmphasis | ✅ |
+| Implement HighGrayLevelZoneEmphasis | ✅ |
+| Implement SmallAreaLowGrayLevelEmphasis | ✅ |
+| Implement SmallAreaHighGrayLevelEmphasis | ✅ |
+| Implement LargeAreaLowGrayLevelEmphasis | ✅ |
+| Implement LargeAreaHighGrayLevelEmphasis | ✅ |
+| All functions have docstrings | ✅ |
+| Commit with descriptive message | ✅ |
+

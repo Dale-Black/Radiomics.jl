@@ -66,9 +66,11 @@ include("glszm.jl")
 # Neighbouring Gray Tone Difference Matrix (NGTDM) features
 include("ngtdm.jl")
 
+# Gray Level Dependence Matrix (GLDM) features
+include("gldm.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("gldm.jl")
 # include("extractor.jl")
 
 # Export abstract types
@@ -191,5 +193,13 @@ export ngtdm_num_valid_voxels, ngtdm_sum_s
 export ngtdm_coarseness, ngtdm_contrast, ngtdm_busyness
 export ngtdm_complexity, ngtdm_strength
 export compute_all_ngtdm_features
+
+# Export GLDM computation functions and types
+export GLDMResult, GLDMResult2D
+export compute_gldm, compute_gldm_2d
+export GLDM_DIRECTIONS_3D, GLDM_DIRECTIONS_2D
+export gldm_num_gray_levels, gldm_num_valid_gray_levels
+export gldm_num_zones, gldm_max_dependence
+export gldm_gray_levels, gldm_dependence_sizes
 
 end # module Radiomics

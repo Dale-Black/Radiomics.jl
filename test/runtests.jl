@@ -75,7 +75,12 @@ include("test_utils.jl")
     # NGTDM feature parity tests
     include("test_ngtdm.jl")
 
-    # include("test_gldm.jl")
-    # include("test_integration.jl")
-    # include("test_full_parity.jl")
+    # GLDM feature parity tests
+    include("test_gldm.jl")
+
+    # Integration tests
+    include("test_integration.jl")
+
+    # Full parity tests (comprehensive PyRadiomics comparison)
+    include("test_full_parity.jl")
 end

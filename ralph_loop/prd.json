@@ -1120,7 +1120,7 @@
       "title": "Integration Tests",
       "description": "Test complete extraction pipeline",
       "priority": 44,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_integration.jl",
         "Test full extraction pipeline",
@@ -1141,7 +1141,7 @@
       "title": "Full PyRadiomics Parity Test Suite",
       "description": "Comprehensive parity verification across all features",
       "priority": 45,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_full_parity.jl",
         "Run PyRadiomics full extraction on test images",

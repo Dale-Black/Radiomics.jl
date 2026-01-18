@@ -6650,3 +6650,105 @@ self.coefficients['jvector'] = jvector  # Zone size values
 | List all GLSZM features with formulas | ✅ (all 16 features) |
 | Create implementation checklist in progress.md | ✅ |
 
+
+### Iteration 32 - 2026-01-17 16:02:14
+
+**Agent started** (Open: 18, Done: 30)
+
+
+---
+
+## Iteration 33: IMPL-GLSZM-MATRIX
+
+**Date**: 2026-01-17
+**Story**: IMPL-GLSZM-MATRIX - Implement GLSZM Matrix Computation
+**Status**: ✅ COMPLETED
+
+### Summary
+
+Implemented the Gray Level Size Zone Matrix (GLSZM) computation module, including connected component labeling, zone size computation, and the full GLSZM matrix computation for both 2D and 3D images.
+
+### Key Difference from GLRLM/GLCM
+
+Unlike GLCM and GLRLM which compute matrices per-direction, GLSZM is **rotation-independent** - only one matrix is computed for the entire ROI. Zones are identified using connected component labeling with configurable connectivity.
+
+### Types Implemented
+
+#### GLSZMResult
+Container for 3D GLSZM computation results:
+- `matrix::Matrix{Float64}`: GLSZM matrix (Ng × Ns)
+- `Ng::Int`: Number of gray levels
+- `Ns::Int`: Maximum zone size
+- `Nz::Int`: Total number of zones
+- `Np::Int`: Total number of voxels in zones
+
+#### GLSZMResult2D
+Same structure for 2D images.
+
+### Functions Implemented
+
+#### Connected Component Labeling
+- `_label_components_3d(binary_mask; connectivity)`: Label connected components in 3D
+  - Uses iterative flood-fill with stack (avoids stack overflow)
+  - Supports 26-connectivity (default, matches PyRadiomics) or 6-connectivity
+- `_label_components_2d(binary_mask; connectivity)`: Label connected components in 2D
+  - Supports 8-connectivity (default) or 4-connectivity
+
+#### Zone Size Computation
+- `_compute_zone_sizes(labels, max_label)`: Count voxels in each labeled component
+
+#### GLSZM Matrix Computation
+- `compute_glszm(image, mask; Ng, connectivity)`: Compute GLSZM for 3D integer arrays
+- `compute_glszm_2d(image, mask; Ng, connectivity)`: Compute GLSZM for 2D integer arrays
+- `compute_glszm(image, mask; binwidth, bincount, connectivity)`: Convenience wrapper with discretization
+
+#### Utility Functions
+- `glszm_num_gray_levels(result)`: Get number of gray levels
+- `glszm_max_zone_size(result)`: Get maximum zone size
+- `glszm_num_zones(result)`: Get total number of zones (Nz)
+- `glszm_num_voxels(result)`: Get total voxels in zones (Np)
+
+### Algorithm Details
+
+1. For each gray level (1 to Ng):
+   - Create binary mask of voxels with that gray level AND within the ROI mask
+   - Run connected component labeling (26-connectivity in 3D, 8-connectivity in 2D)
+   - Compute size of each component
+   - Record (gray_level, zone_size) counts in GLSZM
+
+2. Connected component labeling uses iterative flood-fill:
+   - Stack-based to avoid recursion depth issues on large images
+   - Efficient for typical medical imaging volumes
+
+### Connectivity Options
+
+| Dimension | Default | Alternative |
+|-----------|---------|-------------|
+| 3D | 26-connected (all neighbors including diagonals) | 6-connected (face neighbors only) |
+| 2D | 8-connected (all neighbors including diagonals) | 4-connected (edge neighbors only) |
+
+### Files Created/Modified
+
+- `src/glszm.jl` - NEW: GLSZM matrix computation (~580 lines)
+- `src/Radiomics.jl` - Updated: includes glszm.jl, exports GLSZM functions
+
+### Verification
+
+All basic tests passed:
+- Package loads without errors
+- GLSZMResult and GLSZMResult2D types exist
+- compute_glszm works for 3D and 2D images
+- Zone counts and voxel counts are correct
+- Matrix dimensions match expected (Ng × Ns)
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create src/glszm.jl module | ✅ |
+| Implement connected component labeling | ✅ |
+| Implement zone size computation | ✅ |
+| Implement GLSZM matrix computation | ✅ |
+| Support configurable connectivity | ✅ |
+| Commit with descriptive message | ⏳ (pending) |
+

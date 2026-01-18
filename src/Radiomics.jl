@@ -60,9 +60,11 @@ include("glcm.jl")
 # Gray Level Run Length Matrix (GLRLM) features
 include("glrlm.jl")
 
+# Gray Level Size Zone Matrix (GLSZM) features
+include("glszm.jl")
+
 # Module files will be included here as they are implemented
 # include("utils.jl")
-# include("glszm.jl")
 # include("ngtdm.jl")
 # include("gldm.jl")
 # include("extractor.jl")
@@ -156,5 +158,11 @@ export compute_glrlm, compute_glrlm_2d
 export GLRLM_DIRECTIONS_3D, GLRLM_DIRECTIONS_2D
 export glrlm_num_gray_levels, glrlm_num_directions, glrlm_max_run_length
 export glrlm_num_runs, glrlm_num_voxels
+
+# Export GLSZM computation functions and types
+export GLSZMResult, GLSZMResult2D
+export compute_glszm, compute_glszm_2d
+export glszm_num_gray_levels, glszm_max_zone_size
+export glszm_num_zones, glszm_num_voxels
 
 end # module Radiomics

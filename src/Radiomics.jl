@@ -69,9 +69,8 @@ include("ngtdm.jl")
 # Gray Level Dependence Matrix (GLDM) features
 include("gldm.jl")
 
-# Module files will be included here as they are implemented
-# include("utils.jl")
-# include("extractor.jl")
+# Feature extractor - unified extraction interface
+include("extractor.jl")
 
 # Export abstract types
 export AbstractRadiomicsFeature,
@@ -210,5 +209,13 @@ export gldm_gray_level_variance, gldm_dependence_variance, gldm_dependence_entro
 export gldm_low_gray_level_emphasis, gldm_high_gray_level_emphasis
 export gldm_small_dependence_low_gray_level_emphasis, gldm_small_dependence_high_gray_level_emphasis
 export gldm_large_dependence_low_gray_level_emphasis, gldm_large_dependence_high_gray_level_emphasis
+
+# Export feature extractor types and functions
+export FeatureClass, FirstOrder, Shape, GLCM, GLRLM, GLSZM, NGTDM, GLDM
+export RadiomicsFeatureExtractor
+export extract, enable!, disable!, enable_all!, disable_all!
+export is_enabled, enabled_classes
+export extract_all, extract_firstorder_only, extract_shape_only, extract_texture_only
+export feature_count, total_feature_count, feature_names, all_feature_names
 
 end # module Radiomics

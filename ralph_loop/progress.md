@@ -6459,3 +6459,194 @@ test/
 | Commit test file with descriptive message | ✅ |
 
 ---
+
+### Iteration 31 - 2026-01-17 15:57:43
+
+**Agent started** (Open: 19, Done: 29)
+
+**Story**: RESEARCH-GLSZM-DETAILS
+**Status**: ✅ COMPLETED
+
+---
+
+## GLSZM Research Findings
+
+### 1. GLSZM Matrix Definition
+
+The **Gray Level Size Zone Matrix (GLSZM)** quantifies gray level zones in an image. A gray level zone is defined as a region of connected voxels that all share the same gray level intensity.
+
+**Matrix Structure**:
+- `P(i,j)` = number of zones with gray level `i` and size (number of voxels) `j`
+- Rows: Gray levels (Ng discrete intensity values)
+- Columns: Zone sizes (from 1 to maximum zone size in the ROI)
+
+**Key Difference from GLRLM**: Unlike GLCM and GLRLM which are directional, the GLSZM is **rotation-independent** - only one matrix is computed for all directions in the ROI.
+
+**Reference**:
+- PyRadiomics: `radiomics/glszm.py`
+- Original paper: Guillaume Thibault et al. (2009). "Texture Indexes and Gray Level Size Zone Matrix. Application to Cell Nuclei Classification". PRIP: 140-145.
+
+### 2. Zone Detection Algorithm (Connected Component Labeling)
+
+Zones are identified using **connected component labeling** with the following connectivity:
+
+| Dimension | Connectivity | Description |
+|-----------|--------------|-------------|
+| 3D | 26-connected | Distance = 1 using infinity norm |
+| 2D | 8-connected | All 8 neighbors considered |
+
+**Algorithm Details** (from PyRadiomics C implementation):
+1. For each gray level, identify all voxels with that intensity
+2. Use iterative region growing (while loops, not recursion) to find connected components
+3. Count the size (number of voxels) of each connected component
+4. Increment `P(gray_level, zone_size)` for each zone found
+
+**PyRadiomics Implementation**:
+- C extension: `cMatrices.calculate_glszm()` for performance
+- Python fallback available if C extension fails
+- Empty gray levels are removed from matrix after computation
+- Empty zone sizes are also removed to optimize storage
+
+### 3. Connectivity Details
+
+**Infinity Norm (26-connectivity in 3D)**:
+A voxel at position (x, y, z) is connected to all voxels (x', y', z') where:
+```
+max(|x - x'|, |y - y'|, |z - z'|) = 1
+```
+
+This yields:
+- 3D: 26 neighbors (all adjacent voxels including diagonals)
+- 2D: 8 neighbors (all adjacent pixels including diagonals)
+
+**Julia Implementation Strategy**:
+Use `Images.jl` or `ImageMorphology.jl` connected component labeling with:
+- `label_components()` function with appropriate connectivity strel
+- Or implement custom flood-fill/union-find algorithm
+
+### 4. All 16 GLSZM Features with Mathematical Formulas
+
+Let:
+- `N_g` = number of discrete gray levels
+- `N_s` = maximum zone size
+- `N_z` = total number of zones = ΣᵢΣⱼ P(i,j)
+- `N_p` = total number of voxels in ROI = Σᵢ Σⱼ j·P(i,j)
+- `P(i,j)` = GLSZM matrix entry
+- `p(i,j)` = P(i,j) / N_z (normalized)
+- `pᵢ` = Σⱼ P(i,j) (marginal sum over zone sizes for gray level i)
+- `pⱼ` = Σᵢ P(i,j) (marginal sum over gray levels for zone size j)
+
+#### 4.1 Zone Size Emphasis Features
+
+| # | Feature | Formula | Description |
+|---|---------|---------|-------------|
+| 1 | **Small Area Emphasis (SAE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)/j²` | Emphasizes smaller zones; higher = finer texture |
+| 2 | **Large Area Emphasis (LAE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)·j²` | Emphasizes larger zones; higher = coarser texture |
+
+#### 4.2 Non-Uniformity Features
+
+| # | Feature | Formula | Description |
+|---|---------|---------|-------------|
+| 3 | **Gray Level Non-Uniformity (GLN)** | `(1/Nz) Σᵢ pᵢ²` | Measures gray level variability; lower = more homogeneous |
+| 4 | **Gray Level Non-Uniformity Normalized (GLNN)** | `(1/Nz²) Σᵢ pᵢ²` | Normalized version of GLN |
+| 5 | **Size-Zone Non-Uniformity (SZN)** | `(1/Nz) Σⱼ pⱼ²` | Measures zone size variability; lower = more uniform |
+| 6 | **Size-Zone Non-Uniformity Normalized (SZNN)** | `(1/Nz²) Σⱼ pⱼ²` | Normalized version of SZN |
+
+#### 4.3 Zone Statistics Features
+
+| # | Feature | Formula | Description |
+|---|---------|---------|-------------|
+| 7 | **Zone Percentage (ZP)** | `Nz / Np` | Ratio of zones to voxels; higher = finer texture |
+| 8 | **Gray Level Variance (GLV)** | `Σᵢ Σⱼ p(i,j)·(i - μᵢ)²` where `μᵢ = Σᵢ Σⱼ p(i,j)·i` | Variance in gray levels |
+| 9 | **Zone Variance (ZV)** | `Σᵢ Σⱼ p(i,j)·(j - μⱼ)²` where `μⱼ = Σᵢ Σⱼ p(i,j)·j` | Variance in zone sizes |
+| 10 | **Zone Entropy (ZE)** | `-Σᵢ Σⱼ p(i,j)·log₂(p(i,j) + ε)` | Randomness/heterogeneity measure |
+
+#### 4.4 Gray Level Emphasis Features
+
+| # | Feature | Formula | Description |
+|---|---------|---------|-------------|
+| 11 | **Low Gray Level Zone Emphasis (LGLZE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)/i²` | Higher proportion of lower intensities |
+| 12 | **High Gray Level Zone Emphasis (HGLZE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)·i²` | Higher proportion of higher intensities |
+
+#### 4.5 Joint Emphasis Features
+
+| # | Feature | Formula | Description |
+|---|---------|---------|-------------|
+| 13 | **Small Area Low Gray Level Emphasis (SALGLE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)/(i²·j²)` | Small zones with low intensity |
+| 14 | **Small Area High Gray Level Emphasis (SAHGLE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)·i²/j²` | Small zones with high intensity |
+| 15 | **Large Area Low Gray Level Emphasis (LALGLE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)·j²/i²` | Large zones with low intensity |
+| 16 | **Large Area High Gray Level Emphasis (LAHGLE)** | `(1/Nz) Σᵢ Σⱼ P(i,j)·i²·j²` | Large zones with high intensity |
+
+### 5. PyRadiomics Implementation Details
+
+**Source Location**: `radiomics/glszm.py`
+
+**Key Methods**:
+- `_calculateMatrix()`: Computes GLSZM via C extension
+- `_calculateCoefficients()`: Precomputes `ps`, `pg`, `Nz`, `Np`, `ivector`, `jvector`
+
+**Precomputed Coefficients**:
+```python
+# In _calculateCoefficients():
+self.P_glszm = P_glszm  # The GLSZM matrix
+self.coefficients['Np'] = Np  # Total voxels represented
+self.coefficients['Nz'] = Nz  # Total zones
+self.coefficients['ps'] = ps  # Sum over gray levels (zone size distribution)
+self.coefficients['pg'] = pg  # Sum over sizes (gray level distribution)
+self.coefficients['ivector'] = ivector  # Gray level values
+self.coefficients['jvector'] = jvector  # Zone size values
+```
+
+**Binning**: Image is discretized before GLSZM computation using the same binning scheme as other texture features.
+
+### 6. Julia Implementation Checklist
+
+| Task | Julia Function | Status |
+|------|---------------|--------|
+| Connected component labeling | `label_components()` from ImageMorphology.jl or custom | ⏳ |
+| GLSZM matrix computation | `compute_glszm(image, mask; kwargs...)` | ⏳ |
+| Small Area Emphasis | `glszm_small_area_emphasis(P)` | ⏳ |
+| Large Area Emphasis | `glszm_large_area_emphasis(P)` | ⏳ |
+| Gray Level Non-Uniformity | `glszm_gray_level_non_uniformity(P)` | ⏳ |
+| Gray Level Non-Uniformity Normalized | `glszm_gray_level_non_uniformity_normalized(P)` | ⏳ |
+| Size-Zone Non-Uniformity | `glszm_size_zone_non_uniformity(P)` | ⏳ |
+| Size-Zone Non-Uniformity Normalized | `glszm_size_zone_non_uniformity_normalized(P)` | ⏳ |
+| Zone Percentage | `glszm_zone_percentage(P, Np)` | ⏳ |
+| Gray Level Variance | `glszm_gray_level_variance(P)` | ⏳ |
+| Zone Variance | `glszm_zone_variance(P)` | ⏳ |
+| Zone Entropy | `glszm_zone_entropy(P)` | ⏳ |
+| Low Gray Level Zone Emphasis | `glszm_low_gray_level_zone_emphasis(P)` | ⏳ |
+| High Gray Level Zone Emphasis | `glszm_high_gray_level_zone_emphasis(P)` | ⏳ |
+| Small Area Low Gray Level Emphasis | `glszm_small_area_low_gray_level_emphasis(P)` | ⏳ |
+| Small Area High Gray Level Emphasis | `glszm_small_area_high_gray_level_emphasis(P)` | ⏳ |
+| Large Area Low Gray Level Emphasis | `glszm_large_area_low_gray_level_emphasis(P)` | ⏳ |
+| Large Area High Gray Level Emphasis | `glszm_large_area_high_gray_level_emphasis(P)` | ⏳ |
+
+### 7. Key Implementation Notes
+
+1. **Connectivity**: Use 26-connectivity (3D) / 8-connectivity (2D) to match PyRadiomics
+2. **Empty Level Removal**: Remove gray levels not present in ROI from matrix
+3. **Empty Zone Removal**: Remove zone sizes with zero occurrences
+4. **Epsilon for Log**: Use machine epsilon (≈2.2e-16) to avoid log(0)
+5. **Gray Level Indexing**: Gray levels are 1-indexed in formulas (i = 1 to Ng)
+6. **Zone Size Indexing**: Zone sizes are 1-indexed (j = 1 to max_zone_size)
+
+### 8. References
+
+- PyRadiomics Documentation: https://pyradiomics.readthedocs.io/en/latest/features.html
+- PyRadiomics Source: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/glszm.py
+- IBSI Documentation: https://ibsi.readthedocs.io/
+- Original Paper: Thibault et al. (2009). "Texture Indexes and Gray Level Size Zone Matrix". PRIP.
+
+---
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Document GLSZM matrix definition | ✅ |
+| Document size zone detection algorithm | ✅ |
+| Document connectivity (6 vs 26 connected) | ✅ (26-connected in 3D, 8-connected in 2D) |
+| List all GLSZM features with formulas | ✅ (all 16 features) |
+| Create implementation checklist in progress.md | ✅ |
+

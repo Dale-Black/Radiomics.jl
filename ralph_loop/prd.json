@@ -707,7 +707,7 @@
       "title": "Research GLSZM Features in Detail",
       "description": "Document GLSZM matrix computation and features",
       "priority": 30,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Document GLSZM matrix definition",
         "Document size zone detection algorithm",

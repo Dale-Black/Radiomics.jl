@@ -860,7 +860,7 @@
       "title": "Research GLDM Features in Detail",
       "description": "Document GLDM matrix computation and features",
       "priority": 38,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Document GLDM matrix definition",
         "Document dependence computation algorithm",

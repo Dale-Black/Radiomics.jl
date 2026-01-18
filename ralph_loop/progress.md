@@ -7590,3 +7590,613 @@ All tests pass within these strict tolerances after the fix.
 ```
 TEST-NGTDM-PARITY: Add NGTDM parity tests and fix boundary voxel handling
 ```
+
+### Iteration 39 - 2026-01-17 16:46:05
+
+**Story**: RESEARCH-GLDM-DETAILS
+**Status**: ✅ COMPLETED
+
+### Objective
+
+Document exact implementation details of the Gray Level Dependence Matrix (GLDM) computation and all 14 GLDM features from PyRadiomics, including mathematical formulas, the alpha parameter, and Julia implementation notes.
+
+---
+
+## Gray Level Dependence Matrix (GLDM) - Detailed Research
+
+**Source File**: `radiomics/gldm.py` (PyRadiomics)
+**C Implementation**: `radiomics/src/cmatrices.c` - `calculate_gldm()` function
+**Documentation**: https://pyradiomics.readthedocs.io/en/latest/features.html
+**Original Reference**: Sun C, Wee WG. "Neighboring Gray Level Dependence Matrix for Texture Classification." Computer Vision, Graphics, and Image Processing, 1983.
+
+### What is GLDM?
+
+The Gray Level Dependence Matrix (GLDM) quantifies gray level dependencies in an image. A **gray level dependency** is defined as the number of connected voxels within a specified distance δ that are dependent on the center voxel.
+
+**Key Terminology:**
+- **GLDM** = Gray Level Dependence Matrix (PyRadiomics naming)
+- **NGLDM** = Neighbouring Grey Level Dependence Matrix (IBSI naming)
+- These are the same concept with different naming conventions.
+
+### Dependence Definition
+
+A neighboring voxel with gray level **j** is considered **dependent** on center voxel with gray level **i** if:
+
+```
+|i - j| ≤ α
+```
+
+Where:
+- α (alpha) is the coarseness parameter (default = 0)
+- With α = 0, only **exact** gray level matches count as dependent
+- Higher α values allow greater intensity differences
+
+### GLDM Matrix Construction
+
+The GLDM matrix **P(i,j)** has:
+- **Rows (i)**: Gray levels (1 to Ng)
+- **Columns (j)**: Dependence counts (0 to maximum possible neighbors)
+
+**P(i,j)** = count of voxels in the ROI with:
+- Gray level **i**
+- Exactly **j** dependent neighbors
+
+### Algorithm (from PyRadiomics C implementation)
+
+```
+For each voxel at position p with gray level g[p]:
+    1. Initialize dependency_count = 0
+    2. For each neighbor n within distance δ (13 directions in 3D):
+        a. Check boundary conditions
+        b. diff = |g[p] - g[n]|
+        c. If diff ≤ α:
+            dependency_count += 1
+    3. Increment P[g[p], dependency_count] += 1
+```
+
+**Neighbor Directions**: Uses 13 unique 3D directions (same as GLCM/GLRLM):
+- 3 axis-aligned: (1,0,0), (0,1,0), (0,0,1)
+- 6 face-diagonals: (1,1,0), (1,-1,0), (1,0,1), (1,0,-1), (0,1,1), (0,1,-1)
+- 4 space-diagonals: (1,1,1), (1,1,-1), (1,-1,1), (1,-1,-1)
+
+**Maximum Dependence Count**: With distance=1 and 13 directions, each voxel has at most 26 neighbors (13 directions × 2 for forward/backward). Therefore, max dependence = 26.
+
+### Key Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `gldm_a` (α) | 0 | Coarseness parameter. Neighbors with \|diff\| ≤ α are dependent |
+| `distances` | [1] | Chebyshev distance for neighborhood. Usually 1. |
+
+### Matrix Normalization
+
+After computing P(i,j):
+1. Remove gray levels not present in ROI (empty rows)
+2. Remove dependence sizes not present (empty columns)
+3. Compute Nz = sum of all P(i,j) = total dependency zones = number of voxels in ROI
+
+**Key Property**: Nz = Np (number of voxels) because every voxel has exactly one dependency zone.
+
+### Derived Matrices
+
+```python
+# Marginal sums
+pg = sum(P, axis=1)  # Sum over j (dependence sizes) - per gray level
+pd = sum(P, axis=0)  # Sum over i (gray levels) - per dependence size
+
+# Normalized matrix
+p(i,j) = P(i,j) / Nz
+
+# Index vectors for formula computation
+ivector = [1, 2, 3, ..., Ng]  # Gray level indices
+jvector = [j1, j2, j3, ...]   # Dependence size indices (non-empty columns)
+```
+
+---
+
+## GLDM Features - 14 Total
+
+| # | Feature Name | IBSI Code | Formula Type |
+|---|--------------|-----------|--------------|
+| 1 | SmallDependenceEmphasis | SODN | Emphasis |
+| 2 | LargeDependenceEmphasis | IANU | Emphasis |
+| 3 | GrayLevelNonUniformity | FP8K | Non-uniformity |
+| 4 | DependenceNonUniformity | Z87G | Non-uniformity |
+| 5 | DependenceNonUniformityNormalized | OKJI | Non-uniformity |
+| 6 | GrayLevelVariance | QK93 | Variance |
+| 7 | DependenceVariance | 7162 | Variance |
+| 8 | DependenceEntropy | GBDU | Entropy |
+| 9 | LowGrayLevelEmphasis | 5W23 | Emphasis |
+| 10 | HighGrayLevelEmphasis | DHV0 | Emphasis |
+| 11 | SmallDependenceLowGrayLevelEmphasis | RUVG | Combined |
+| 12 | SmallDependenceHighGrayLevelEmphasis | DKNJ | Combined |
+| 13 | LargeDependenceLowGrayLevelEmphasis | A7WM | Combined |
+| 14 | LargeDependenceHighGrayLevelEmphasis | KLTH | Combined |
+
+**Deprecated Features** (not in our implementation):
+- GrayLevelNonUniformityNormalized - Mathematically equals FirstOrder Uniformity
+- DependencePercentage - Always equals 1.0 (since Nz = Np)
+
+---
+
+### Detailed Feature Specifications
+
+#### 1. Small Dependence Emphasis (SDE) - IBSI: SODN
+**PyRadiomics Method**: `getSmallDependenceEmphasisFeatureValue()`
+
+**Formula**:
+```
+SDE = (1/Nz) × Σᵢ Σⱼ P(i,j)/j²
+```
+
+**Interpretation**: Measures the distribution of small dependencies. A greater value indicates smaller dependence and less homogeneous textures.
+
+**Julia Implementation**:
+```julia
+function small_dependence_emphasis(P::Matrix, jvector::Vector, Nz::Int)
+    sde = 0.0
+    for (j_idx, j) in enumerate(jvector)
+        for i in axes(P, 1)
+            sde += P[i, j_idx] / (j * j)
+        end
+    end
+    return sde / Nz
+end
+```
+
+---
+
+#### 2. Large Dependence Emphasis (LDE) - IBSI: IANU
+**PyRadiomics Method**: `getLargeDependenceEmphasisFeatureValue()`
+
+**Formula**:
+```
+LDE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j²
+```
+
+**Interpretation**: Measures the distribution of large dependencies. A greater value indicates larger dependence and more homogeneous textures.
+
+**Julia Implementation**:
+```julia
+function large_dependence_emphasis(P::Matrix, jvector::Vector, Nz::Int)
+    lde = 0.0
+    for (j_idx, j) in enumerate(jvector)
+        for i in axes(P, 1)
+            lde += P[i, j_idx] * (j * j)
+        end
+    end
+    return lde / Nz
+end
+```
+
+---
+
+#### 3. Gray Level Non-Uniformity (GLN) - IBSI: FP8K
+**PyRadiomics Method**: `getGrayLevelNonUniformityFeatureValue()`
+
+**Formula**:
+```
+GLN = (1/Nz) × Σᵢ (Σⱼ P(i,j))²
+```
+
+**Interpretation**: Measures similarity of gray-level intensity values. A lower GLN value correlates with greater similarity in intensity values.
+
+**Julia Implementation**:
+```julia
+function gray_level_non_uniformity(P::Matrix, Nz::Int)
+    pg = vec(sum(P, dims=2))  # Sum over j for each i
+    return sum(pg.^2) / Nz
+end
+```
+
+---
+
+#### 4. Dependence Non-Uniformity (DN) - IBSI: Z87G
+**PyRadiomics Method**: `getDependenceNonUniformityFeatureValue()`
+
+**Formula**:
+```
+DN = (1/Nz) × Σⱼ (Σᵢ P(i,j))²
+```
+
+**Interpretation**: Measures similarity of dependence throughout the image. A lower value indicates more homogeneity among dependencies.
+
+**Julia Implementation**:
+```julia
+function dependence_non_uniformity(P::Matrix, Nz::Int)
+    pd = vec(sum(P, dims=1))  # Sum over i for each j
+    return sum(pd.^2) / Nz
+end
+```
+
+---
+
+#### 5. Dependence Non-Uniformity Normalized (DNN) - IBSI: OKJI
+**PyRadiomics Method**: `getDependenceNonUniformityNormalizedFeatureValue()`
+
+**Formula**:
+```
+DNN = (1/Nz²) × Σⱼ (Σᵢ P(i,j))²
+```
+
+**Interpretation**: Normalized version of DN.
+
+**Julia Implementation**:
+```julia
+function dependence_non_uniformity_normalized(P::Matrix, Nz::Int)
+    pd = vec(sum(P, dims=1))
+    return sum(pd.^2) / (Nz * Nz)
+end
+```
+
+---
+
+#### 6. Gray Level Variance (GLV) - IBSI: QK93
+**PyRadiomics Method**: `getGrayLevelVarianceFeatureValue()`
+
+**Formula**:
+```
+μ = Σᵢ Σⱼ i × p(i,j)
+GLV = Σᵢ Σⱼ p(i,j) × (i - μ)²
+```
+Where p(i,j) = P(i,j) / Nz
+
+**Interpretation**: Measures variance in grey level in the image.
+
+**Julia Implementation**:
+```julia
+function gray_level_variance(P::Matrix, ivector::Vector, Nz::Int)
+    p = P ./ Nz
+    # Compute mean gray level
+    μ = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for j_idx in axes(P, 2)
+            μ += i * p[i_idx, j_idx]
+        end
+    end
+    # Compute variance
+    glv = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for j_idx in axes(P, 2)
+            glv += p[i_idx, j_idx] * (i - μ)^2
+        end
+    end
+    return glv
+end
+```
+
+---
+
+#### 7. Dependence Variance (DV) - IBSI: 7162
+**PyRadiomics Method**: `getDependenceVarianceFeatureValue()`
+
+**Formula**:
+```
+μ = Σᵢ Σⱼ j × p(i,j)
+DV = Σᵢ Σⱼ p(i,j) × (j - μ)²
+```
+
+**Interpretation**: Measures variance in dependence size in the image.
+
+**Julia Implementation**:
+```julia
+function dependence_variance(P::Matrix, jvector::Vector, Nz::Int)
+    p = P ./ Nz
+    # Compute mean dependence
+    μ = 0.0
+    for i_idx in axes(P, 1)
+        for (j_idx, j) in enumerate(jvector)
+            μ += j * p[i_idx, j_idx]
+        end
+    end
+    # Compute variance
+    dv = 0.0
+    for i_idx in axes(P, 1)
+        for (j_idx, j) in enumerate(jvector)
+            dv += p[i_idx, j_idx] * (j - μ)^2
+        end
+    end
+    return dv
+end
+```
+
+---
+
+#### 8. Dependence Entropy (DE) - IBSI: GBDU
+**PyRadiomics Method**: `getDependenceEntropyFeatureValue()`
+
+**Formula**:
+```
+DE = -Σᵢ Σⱼ p(i,j) × log₂(p(i,j) + ε)
+```
+Where ε = machine epsilon ≈ 2.2 × 10⁻¹⁶
+
+**Interpretation**: Measures randomness/complexity in the joint distribution.
+
+**Julia Implementation**:
+```julia
+function dependence_entropy(P::Matrix, Nz::Int)
+    p = P ./ Nz
+    eps_val = eps(Float64)
+    de = 0.0
+    for pval in p
+        if pval > 0
+            de -= pval * log2(pval + eps_val)
+        end
+    end
+    return de
+end
+```
+
+---
+
+#### 9. Low Gray Level Emphasis (LGLE) - IBSI: 5W23
+**PyRadiomics Method**: `getLowGrayLevelEmphasisFeatureValue()`
+
+**Formula**:
+```
+LGLE = (1/Nz) × Σᵢ Σⱼ P(i,j)/i²
+```
+
+**Interpretation**: Measures the distribution of low gray-level values. Higher value indicates greater concentration of low gray-level values.
+
+**Julia Implementation**:
+```julia
+function low_gray_level_emphasis(P::Matrix, ivector::Vector, Nz::Int)
+    lgle = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for j_idx in axes(P, 2)
+            lgle += P[i_idx, j_idx] / (i * i)
+        end
+    end
+    return lgle / Nz
+end
+```
+
+---
+
+#### 10. High Gray Level Emphasis (HGLE) - IBSI: DHV0
+**PyRadiomics Method**: `getHighGrayLevelEmphasisFeatureValue()`
+
+**Formula**:
+```
+HGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i²
+```
+
+**Interpretation**: Measures the distribution of high gray-level values. Higher value indicates greater concentration of high gray-level values.
+
+**Julia Implementation**:
+```julia
+function high_gray_level_emphasis(P::Matrix, ivector::Vector, Nz::Int)
+    hgle = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for j_idx in axes(P, 2)
+            hgle += P[i_idx, j_idx] * (i * i)
+        end
+    end
+    return hgle / Nz
+end
+```
+
+---
+
+#### 11. Small Dependence Low Gray Level Emphasis (SDLGLE) - IBSI: RUVG
+**PyRadiomics Method**: `getSmallDependenceLowGrayLevelEmphasisFeatureValue()`
+
+**Formula**:
+```
+SDLGLE = (1/Nz) × Σᵢ Σⱼ P(i,j)/(i² × j²)
+```
+
+**Interpretation**: Measures the joint distribution of small dependence with lower gray-level values.
+
+**Julia Implementation**:
+```julia
+function small_dependence_low_gray_level_emphasis(P::Matrix, ivector::Vector, jvector::Vector, Nz::Int)
+    sdlgle = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for (j_idx, j) in enumerate(jvector)
+            sdlgle += P[i_idx, j_idx] / (i * i * j * j)
+        end
+    end
+    return sdlgle / Nz
+end
+```
+
+---
+
+#### 12. Small Dependence High Gray Level Emphasis (SDHGLE) - IBSI: DKNJ
+**PyRadiomics Method**: `getSmallDependenceHighGrayLevelEmphasisFeatureValue()`
+
+**Formula**:
+```
+SDHGLE = (1/Nz) × Σᵢ Σⱼ (P(i,j) × i²)/j²
+```
+
+**Interpretation**: Measures the joint distribution of small dependence with higher gray-level values.
+
+**Julia Implementation**:
+```julia
+function small_dependence_high_gray_level_emphasis(P::Matrix, ivector::Vector, jvector::Vector, Nz::Int)
+    sdhgle = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for (j_idx, j) in enumerate(jvector)
+            sdhgle += P[i_idx, j_idx] * (i * i) / (j * j)
+        end
+    end
+    return sdhgle / Nz
+end
+```
+
+---
+
+#### 13. Large Dependence Low Gray Level Emphasis (LDLGLE) - IBSI: A7WM
+**PyRadiomics Method**: `getLargeDependenceLowGrayLevelEmphasisFeatureValue()`
+
+**Formula**:
+```
+LDLGLE = (1/Nz) × Σᵢ Σⱼ (P(i,j) × j²)/i²
+```
+
+**Interpretation**: Measures the joint distribution of large dependence with lower gray-level values.
+
+**Julia Implementation**:
+```julia
+function large_dependence_low_gray_level_emphasis(P::Matrix, ivector::Vector, jvector::Vector, Nz::Int)
+    ldlgle = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for (j_idx, j) in enumerate(jvector)
+            ldlgle += P[i_idx, j_idx] * (j * j) / (i * i)
+        end
+    end
+    return ldlgle / Nz
+end
+```
+
+---
+
+#### 14. Large Dependence High Gray Level Emphasis (LDHGLE) - IBSI: KLTH
+**PyRadiomics Method**: `getLargeDependenceHighGrayLevelEmphasisFeatureValue()`
+
+**Formula**:
+```
+LDHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² × j²
+```
+
+**Interpretation**: Measures the joint distribution of large dependence with higher gray-level values.
+
+**Julia Implementation**:
+```julia
+function large_dependence_high_gray_level_emphasis(P::Matrix, ivector::Vector, jvector::Vector, Nz::Int)
+    ldhgle = 0.0
+    for (i_idx, i) in enumerate(ivector)
+        for (j_idx, j) in enumerate(jvector)
+            ldhgle += P[i_idx, j_idx] * (i * i) * (j * j)
+        end
+    end
+    return ldhgle / Nz
+end
+```
+
+---
+
+### Critical Implementation Notes
+
+#### 1. Gray Level Indexing
+
+GLDM uses **1-based gray level indices** after discretization:
+- Gray levels range from 1 to Ng (not 0 to Ng-1)
+- The ivector contains actual gray level values present in the ROI
+- Empty gray levels (not present in ROI) are removed from the matrix
+
+#### 2. Dependence Count Indexing
+
+- Dependence counts start from **0** (a voxel can have no dependent neighbors)
+- Maximum dependence = 2 × number of angles = 26 for 3D with distance=1
+- jvector contains actual dependence sizes present in the ROI
+- Empty dependence sizes are removed from the matrix
+
+#### 3. Boundary Voxel Handling
+
+Unlike NGTDM which excludes boundary voxels, GLDM **includes all voxels**:
+- Boundary voxels simply have fewer potential neighbors
+- This means boundary voxels may have lower dependence counts
+- The algorithm checks bounds for each neighbor direction
+
+#### 4. Nz = Np Property
+
+A critical property: **Nz (total zones) = Np (total voxels)**
+- Every voxel in the ROI has exactly one entry in the GLDM
+- This is different from GLSZM where Nz can be less than Np
+
+#### 5. Relationship to Other Matrices
+
+| Matrix | What it counts | Zone/Run definition |
+|--------|----------------|---------------------|
+| GLCM | Voxel pairs at distance | Adjacent voxels |
+| GLRLM | Runs of same gray level | Consecutive in direction |
+| GLSZM | Connected regions | 3D connected components |
+| GLDM | Voxels by dependence count | Neighbors within α threshold |
+| NGTDM | Neighborhood differences | All neighbors averaged |
+
+#### 6. Comparison with NGTDM
+
+| Aspect | NGTDM | GLDM |
+|--------|-------|------|
+| Boundary voxels | Excluded | Included |
+| Output | Two vectors (s, p) | 2D matrix P(i,j) |
+| What it measures | Difference from neighbors | Count of similar neighbors |
+| Features | 5 | 14 |
+
+---
+
+### Implementation Checklist
+
+#### Matrix Computation (IMPL-GLDM-MATRIX)
+
+- [ ] Create src/gldm.jl module
+- [ ] Implement `compute_gldm(image, mask; alpha=0, distance=1)` function
+- [ ] Support all 13 directions (26 neighbors) for 3D
+- [ ] Handle 2D images (4 directions, 8 neighbors)
+- [ ] Include boundary voxels with reduced neighbor counts
+- [ ] Return GLDM matrix P, ivector (gray levels), jvector (dependence sizes), Nz
+- [ ] Remove empty rows (gray levels not in ROI)
+- [ ] Remove empty columns (dependence sizes not present)
+- [ ] Add comprehensive docstrings
+
+#### Feature Implementation (IMPL-GLDM-FEATURES)
+
+- [ ] SmallDependenceEmphasis
+- [ ] LargeDependenceEmphasis
+- [ ] GrayLevelNonUniformity
+- [ ] DependenceNonUniformity
+- [ ] DependenceNonUniformityNormalized
+- [ ] GrayLevelVariance
+- [ ] DependenceVariance
+- [ ] DependenceEntropy
+- [ ] LowGrayLevelEmphasis
+- [ ] HighGrayLevelEmphasis
+- [ ] SmallDependenceLowGrayLevelEmphasis
+- [ ] SmallDependenceHighGrayLevelEmphasis
+- [ ] LargeDependenceLowGrayLevelEmphasis
+- [ ] LargeDependenceHighGrayLevelEmphasis
+- [ ] Export all functions
+- [ ] All functions have docstrings with formulas
+
+#### Testing (TEST-GLDM-PARITY)
+
+- [ ] Create test/test_gldm.jl
+- [ ] Test matrix computation matches PyRadiomics
+- [ ] Test all 14 features against PyRadiomics
+- [ ] Test with multiple random seeds
+- [ ] Test with different alpha values (0, 1, 2)
+- [ ] Test with 2D and 3D images
+- [ ] All tests pass within tolerance (rtol=1e-10)
+
+---
+
+### References
+
+- PyRadiomics GLDM: https://pyradiomics.readthedocs.io/en/latest/features.html#gray-level-dependence-matrix-gldm
+- PyRadiomics source: radiomics/gldm.py
+- IBSI documentation: https://ibsi.readthedocs.io/en/latest/03_Image_features.html
+- Original paper: Sun C, Wee WG. "Neighboring Gray Level Dependence Matrix for Texture Classification." Comput Vision, Graph Image Process, 1983.
+
+---
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| Document GLDM matrix definition | ✅ |
+| Document dependence computation algorithm | ✅ |
+| Document the alpha parameter | ✅ |
+| List all GLDM features with formulas | ✅ |
+| Create implementation checklist in progress.md | ✅ |
+
+### Git Commit
+
+```
+RESEARCH-GLDM-DETAILS: Document GLDM matrix and all 14 features with formulas
+```
+

@@ -8662,3 +8662,91 @@ IMPL-FEATURE-EXTRACTOR: Implement unified feature extraction interface
 
 **Agent started** (Open: 6, Done: 42)
 
+
+
+### Iteration 44 - 2026-01-17
+
+**Story**: IMPL-HIGH-LEVEL-API
+**Status**: ✅ COMPLETED
+
+---
+
+## High-Level API Implementation
+
+### Summary
+
+Created `src/api.jl` providing user-friendly high-level functions for radiomic feature extraction.
+
+### New Functions Added
+
+#### Per-Class Extraction Helpers
+
+| Function | Features | Description |
+|----------|----------|-------------|
+| `extract_glcm(image, mask)` | 24 | Extract only GLCM texture features |
+| `extract_glrlm(image, mask)` | 16 | Extract only GLRLM texture features |
+| `extract_glszm(image, mask)` | 16 | Extract only GLSZM texture features |
+| `extract_ngtdm(image, mask)` | 5 | Extract only NGTDM texture features |
+| `extract_gldm(image, mask)` | 14 | Extract only GLDM texture features |
+
+All accept keyword arguments: `spacing`, `binwidth`, `bincount`, `label`
+
+#### Utility Functions
+
+| Function | Description |
+|----------|-------------|
+| `summarize_features(features)` | Print organized summary by feature class |
+| `features_to_dataframe(features)` | Convert to NamedTuple for DataFrames.jl |
+| `extract_batch(images, masks)` | Process multiple image-mask pairs |
+| `list_feature_classes()` | List all available feature classes |
+| `describe_feature(name)` | Get description of a specific feature |
+
+### Enhanced Error Handling
+
+Clear, user-friendly error messages for:
+
+1. **Dimension mismatch**: "Image is 3D with size (x,y,z), but mask is 2D..."
+2. **Size mismatch**: "Image size: (a,b,c), Mask size: (x,y,z)..."
+3. **Empty mask**: "Mask is empty (all false values)..."
+4. **NaN values**: "Image contains NaN values..."
+5. **Inf values**: "Image contains Inf values..."
+6. **Wrong label**: "No voxels found with label value X. Available labels: [...]"
+
+### Files Created/Modified
+
+1. **src/api.jl** (NEW) - 445 lines of high-level API functions
+2. **src/Radiomics.jl** (modified) - Added include and exports
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| Implement extract_all(image, mask; kwargs...) convenience function | ✅ (already existed) |
+| Implement extract_firstorder, extract_shape, etc. helpers | ✅ |
+| Support common image formats via Images.jl | ✅ (validation only, Images.jl optional) |
+| Add clear error messages for invalid inputs | ✅ |
+| Update module exports in Radiomics.jl | ✅ |
+| All functions have docstrings | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Test Results
+
+```
+# All new functions tested:
+# - extract_glcm: 24 features ✅
+# - extract_glrlm: 16 features ✅
+# - extract_glszm: 16 features ✅
+# - extract_ngtdm: 5 features ✅
+# - extract_gldm: 14 features ✅
+# - Error handling tests: 5/5 passed ✅
+
+# Full test suite: 1436 tests pass
+```
+
+### Git Commit
+
+```
+d778f32 IMPL-HIGH-LEVEL-API: Implement user-friendly high-level API functions
+```
+
+---

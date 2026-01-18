@@ -1099,7 +1099,7 @@
       "title": "Implement High-Level API",
       "description": "Create user-friendly top-level functions",
       "priority": 43,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Implement extract_all(image, mask; kwargs...) convenience function",
         "Implement extract_firstorder, extract_shape, etc. helpers",

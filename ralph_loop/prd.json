@@ -789,7 +789,7 @@
       "title": "Research NGTDM Features in Detail",
       "description": "Document NGTDM matrix computation and features",
       "priority": 34,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Document NGTDM matrix definition",
         "Document neighborhood computation",

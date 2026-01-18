@@ -6932,3 +6932,363 @@ TOTAL: 252 tests passed
 | Test EVERY GLSZM feature against PyRadiomics | ✅ |
 | All tests pass within tolerance | ✅ |
 | Commit test file with descriptive message | ✅ |
+
+---
+
+## Iteration 36: RESEARCH-NGTDM-DETAILS
+
+**Date**: 2026-01-17
+**Story**: RESEARCH-NGTDM-DETAILS - Research NGTDM Features in Detail
+**Status**: ✅ COMPLETED
+
+### Summary
+
+Comprehensive research on the Neighbouring Gray Tone Difference Matrix (NGTDM) features. Documented the matrix definition, neighborhood computation algorithm, the s_i and p_i vectors, and all 5 feature formulas with implementation details.
+
+### Sources Consulted
+
+1. **PyRadiomics Documentation**: https://pyradiomics.readthedocs.io/en/stable/features.html
+2. **PyRadiomics Source Code**: https://github.com/AIM-Harvard/pyradiomics/blob/master/radiomics/ngtdm.py
+3. **IBSI Documentation**: https://ibsi.readthedocs.io/en/latest/
+4. **Nyxus Documentation**: https://nyxus.readthedocs.io/en/latest/Math/f_ngtdm.html
+5. **CERR NGTDM Features**: https://github.com/cerr/CERR/wiki/NGTDM_global_features
+6. **Original Paper**: Amadasun M, King R; "Textural features corresponding to textural properties"; IEEE Transactions on Systems, Man and Cybernetics 19:1264-1274 (1989). DOI: 10.1109/21.44046
+
+---
+
+## NGTDM Research Findings
+
+### 1. Matrix Definition
+
+The **Neighbouring Gray Tone Difference Matrix (NGTDM)** quantifies the difference between a gray value and the average gray value of its neighbors within a specified distance δ. Unlike GLCM, GLRLM, or GLSZM which are 2D matrices, NGTDM produces two 1D vectors: **s_i** and **n_i** (or **p_i**).
+
+**Key Concept**: For each gray level i, compute the sum of absolute differences between voxels at that gray level and their neighborhood averages.
+
+### 2. Neighborhood Computation Algorithm
+
+**Step 1: Define Neighborhood**
+
+For a voxel at position (j_x, j_y, j_z), the neighborhood consists of all voxels within Chebyshev distance δ (typically δ=1):
+
+```
+Neighbors = {(j_x + k_x, j_y + k_y, j_z + k_z) : |k_x|, |k_y|, |k_z| ≤ δ, (k_x, k_y, k_z) ≠ (0, 0, 0)}
+```
+
+For δ=1 in 3D, this gives up to 26 neighbors (a 3×3×3 cube minus the center).
+
+**Step 2: Compute Neighborhood Average**
+
+For a voxel at gray level i with position (j_x, j_y, j_z):
+
+```
+Ā_i = (1/W) × Σ x_gl(j_x + k_x, j_y + k_y, j_z + k_z)
+```
+
+Where:
+- The summation is over all valid neighbors (within the mask/ROI)
+- `(k_x, k_y, k_z) ≠ (0, 0, 0)` (excludes center voxel)
+- `W` = number of valid neighbors within the segmented region
+
+**Important**: Only voxels that have at least 1 valid neighbor (within the mask) are included in the computation. Voxels at the boundary with no valid neighbors are excluded.
+
+**Step 3: Compute s_i**
+
+For each gray level i:
+
+```
+s_i = Σ |i - Ā_i|
+```
+
+Sum over all n_i voxels with gray level i. If n_i = 0, then s_i = 0.
+
+### 3. The s_i, n_i, and p_i Vectors
+
+**n_i (Count Vector)**:
+- `n_i` = number of voxels in the ROI with gray level i
+- Only counts voxels that have valid neighborhoods (at least 1 neighbor in ROI)
+
+**N_v,p (Total Valid Voxels)**:
+- `N_v,p = Σ n_i` (total voxels with valid neighborhoods)
+- `N_v,p ≤ N_p` where N_p is total ROI voxels
+
+**p_i (Probability Vector)**:
+- `p_i = n_i / N_v,p` (gray level probability)
+- Represents the fraction of valid voxels at gray level i
+
+**s_i (Sum of Differences Vector)**:
+- `s_i = Σ |i - Ā_i|` for all n_i voxels at gray level i
+- Measures total absolute difference from neighborhood averages
+- If n_i = 0, then s_i = 0
+
+**N_g,p (Number of Non-Empty Gray Levels)**:
+- `N_g,p` = count of gray levels where p_i ≠ 0 (i.e., n_i > 0)
+
+### 4. PyRadiomics NGTDM Matrix Structure
+
+In PyRadiomics, the NGTDM is stored as `P_ngtdm` with shape `(Ng, 3)`:
+- `P_ngtdm[:, 0]` = n_i (voxel counts)
+- `P_ngtdm[:, 1]` = s_i (sum of differences)
+- `P_ngtdm[:, 2]` = gray level values (i)
+
+After computation:
+- Empty gray levels (where n_i = 0) are removed
+- p_i is computed as n_i / N_v,p
+
+### 5. NGTDM Features (5 Total)
+
+All formulas below use indices i, j where p_i ≠ 0 and p_j ≠ 0 (only non-empty gray levels).
+
+---
+
+#### 5.1 Coarseness
+
+**Formula**:
+```
+Coarseness = 1 / Σᵢ (pᵢ × sᵢ)
+```
+
+**Description**: Measures the spatial rate of change in intensity. Higher values indicate locally uniform textures with low spatial change rates. A coarse texture has larger homogeneous regions.
+
+**Edge Case**: If Σ(p_i × s_i) = 0 (completely homogeneous image), return 10^6 to avoid division by zero.
+
+**PyRadiomics Implementation**:
+```python
+def getCoarsenessFeatureValue(self):
+    eps = numpy.spacing(1)  # Machine epsilon
+    sum_coarse = numpy.sum(self.coefficients['p_i'] * self.coefficients['s_i'])
+    if sum_coarse < eps:
+        return 10**6
+    return 1.0 / sum_coarse
+```
+
+---
+
+#### 5.2 Contrast
+
+**Formula**:
+```
+Contrast = [1/(N_g,p × (N_g,p - 1)) × Σᵢ Σⱼ (pᵢ × pⱼ × (i - j)²)] × [1/N_v,p × Σᵢ sᵢ]
+```
+
+Simplified form:
+```
+Contrast = [Σᵢ Σⱼ pᵢ × pⱼ × (i - j)² / (N_g,p × (N_g,p - 1))] × [Σᵢ sᵢ / N_v,p]
+```
+
+**Description**: Measures both the dynamic range of gray levels and the spatial intensity change. Higher values indicate large changes between voxels and their neighborhoods, as well as large gray level differences.
+
+**Edge Case**: If N_g,p = 1 (only one gray level), return 0.
+
+**PyRadiomics Implementation**:
+```python
+def getContrastFeatureValue(self):
+    Ngp = self.coefficients['Ngp']
+    Nvp = self.coefficients['Nvp']
+    p_i = self.coefficients['p_i']
+    s_i = self.coefficients['s_i']
+    i = self.coefficients['i']
+
+    if Ngp == 1:
+        return 0
+
+    # First term: gray level variance
+    term1 = numpy.sum(p_i[:, None] * p_i[None, :] * (i[:, None] - i[None, :]) ** 2)
+    term1 /= (Ngp * (Ngp - 1))
+
+    # Second term: sum of differences
+    term2 = numpy.sum(s_i) / Nvp
+
+    return term1 * term2
+```
+
+---
+
+#### 5.3 Busyness
+
+**Formula**:
+```
+Busyness = Σᵢ (pᵢ × sᵢ) / Σᵢ Σⱼ |i × pᵢ - j × pⱼ|
+```
+
+**Description**: Measures the change from a pixel to its neighbor. A high busyness value indicates a "busy" image with rapid changes of intensity between pixels and their neighborhoods.
+
+**Edge Case**: If N_g,p = 1, return 0 (denominator would be zero).
+
+**PyRadiomics Implementation**:
+```python
+def getBusynessFeatureValue(self):
+    Ngp = self.coefficients['Ngp']
+    p_i = self.coefficients['p_i']
+    s_i = self.coefficients['s_i']
+    i = self.coefficients['i']
+
+    if Ngp == 1:
+        return 0
+
+    numerator = numpy.sum(p_i * s_i)
+    denominator = numpy.sum(numpy.abs(i[:, None] * p_i[:, None] - i[None, :] * p_i[None, :]))
+
+    return numerator / denominator
+```
+
+---
+
+#### 5.4 Complexity
+
+**Formula**:
+```
+Complexity = (1/N_v,p) × Σᵢ Σⱼ [|i - j| × (pᵢ × sᵢ + pⱼ × sⱼ) / (pᵢ + pⱼ)]
+```
+
+**Description**: An image is considered complex when there are many primitive components (i.e., the image is non-uniform with many rapid changes in gray level intensity). The feature measures both the number of primitives and the average difference from the mean value.
+
+**Edge Case**: When p_i + p_j = 0, that term is skipped (which shouldn't happen since we only use non-zero p values).
+
+**PyRadiomics Implementation**:
+```python
+def getComplexityFeatureValue(self):
+    Nvp = self.coefficients['Nvp']
+    p_i = self.coefficients['p_i']
+    s_i = self.coefficients['s_i']
+    i = self.coefficients['i']
+
+    # |i - j| matrix
+    diff_i_j = numpy.abs(i[:, None] - i[None, :])
+
+    # (p_i * s_i + p_j * s_j) matrix
+    ps_sum = (p_i * s_i)[:, None] + (p_i * s_i)[None, :]
+
+    # (p_i + p_j) matrix
+    p_sum = p_i[:, None] + p_i[None, :]
+
+    # Avoid division by zero
+    valid_mask = p_sum > 0
+    result = numpy.sum(numpy.where(valid_mask, diff_i_j * ps_sum / p_sum, 0))
+
+    return result / Nvp
+```
+
+---
+
+#### 5.5 Strength
+
+**Formula**:
+```
+Strength = Σᵢ Σⱼ [(pᵢ + pⱼ) × (i - j)²] / Σᵢ sᵢ
+```
+
+**Description**: Measures the primitives in an image. A high strength value indicates primitives that are easily defined and visible (an image with slow change in intensity but large coarse differences in gray level intensities).
+
+**Edge Case**: If Σ s_i = 0, return 0.
+
+**PyRadiomics Implementation**:
+```python
+def getStrengthFeatureValue(self):
+    p_i = self.coefficients['p_i']
+    s_i = self.coefficients['s_i']
+    i = self.coefficients['i']
+
+    sum_s = numpy.sum(s_i)
+    if sum_s == 0:
+        return 0
+
+    # (p_i + p_j) matrix
+    p_sum = p_i[:, None] + p_i[None, :]
+
+    # (i - j)^2 matrix
+    diff_sq = (i[:, None] - i[None, :]) ** 2
+
+    numerator = numpy.sum(p_sum * diff_sq)
+
+    return numerator / sum_s
+```
+
+---
+
+### 6. Example Calculation (from IBSI)
+
+**Digital Phantom Example (2D, Chebyshev distance 1)**:
+
+| Gray Level (i) | n_i | p_i | s_i |
+|----------------|-----|-----|-----|
+| 1 | 6 | 0.375 | 13.35 |
+| 2 | 2 | 0.125 | 2.00 |
+| 3 | 4 | 0.25 | 2.63 |
+| 5 | 4 | 0.25 | 10.075 |
+
+**s_i Calculation Example**:
+- For gray level 1: s_1 = |1-10/3| + |1-30/8| + |1-15/5| + |1-13/5| + |1-15/5| + |1-11/3| = 13.35
+- For gray level 2: s_2 = |2-15/5| + |2-9/3| = 2
+
+**3D Example (Chebyshev distance 1)**:
+
+| Gray Level (i) | n_i | s_i |
+|----------------|-----|-----|
+| 1 | 50 | 39.946954 |
+| 3 | 1 | 0.200000 |
+| 4 | 16 | 20.825401 |
+| 6 | 7 | 24.127005 |
+
+---
+
+### 7. Implementation Checklist for Julia
+
+#### NGTDM Matrix Computation (IMPL-NGTDM-MATRIX)
+
+- [ ] Create `src/ngtdm.jl` module
+- [ ] Implement `compute_ngtdm(image, mask; distance=1)` function
+- [ ] Handle 2D and 3D images
+- [ ] Implement neighborhood averaging with configurable distance (Chebyshev)
+- [ ] Track which voxels have valid neighborhoods (at least 1 neighbor in mask)
+- [ ] Compute s_i (sum of absolute differences) for each gray level
+- [ ] Compute n_i (voxel counts) for each gray level
+- [ ] Remove empty gray levels (where n_i = 0)
+- [ ] Return struct with: s_i, n_i, p_i, N_v,p, N_g,p, gray level values
+
+#### NGTDM Features (IMPL-NGTDM-FEATURES)
+
+- [ ] Implement `ngtdm_coarseness(P_ngtdm)` - Handle edge case (return 10^6 for homogeneous)
+- [ ] Implement `ngtdm_contrast(P_ngtdm)` - Handle edge case (return 0 when N_g,p = 1)
+- [ ] Implement `ngtdm_busyness(P_ngtdm)` - Handle edge case (return 0 when N_g,p = 1)
+- [ ] Implement `ngtdm_complexity(P_ngtdm)` - Handle division by zero in (p_i + p_j)
+- [ ] Implement `ngtdm_strength(P_ngtdm)` - Handle edge case (return 0 when Σs_i = 0)
+- [ ] Add comprehensive docstrings with formulas
+- [ ] Export all functions
+
+#### Testing (TEST-NGTDM-PARITY)
+
+- [ ] Create `test/test_ngtdm.jl`
+- [ ] Test NGTDM matrix computation against PyRadiomics
+- [ ] Test all 5 features with multiple random seeds
+- [ ] Test with different bin widths
+- [ ] Test edge cases (homogeneous image, single gray level)
+- [ ] Use tolerance: rtol=1e-10, atol=1e-12
+
+---
+
+### 8. Key Implementation Notes
+
+1. **Chebyshev Distance**: PyRadiomics uses Chebyshev distance (max of absolute differences) for neighborhood definition, giving a cubic neighborhood.
+
+2. **Valid Voxel Definition**: A voxel is "valid" for NGTDM if it has at least 1 neighbor within the mask. Boundary voxels with no valid neighbors are excluded.
+
+3. **Discretization**: NGTDM is computed on discretized images (after binning). Use the same discretization settings as other texture features.
+
+4. **Distance Parameter**: Default distance δ=1 (immediate neighbors). PyRadiomics supports configurable distance via `distances` parameter.
+
+5. **Matrix Shape**: Unlike GLCM (N_g × N_g) or GLRLM (N_g × max_run), NGTDM is just two vectors of length N_g (or N_g,p after removing empty levels).
+
+6. **Homogeneous Image Handling**: A completely uniform image has s_i = 0 for all i. Coarseness returns 10^6, others return 0.
+
+---
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Document NGTDM matrix definition | ✅ |
+| Document neighborhood computation | ✅ |
+| Document the s_i and p_i vectors | ✅ |
+| List all NGTDM features with formulas | ✅ |
+| Create implementation checklist in progress.md | ✅ |
+

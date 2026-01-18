@@ -605,6 +605,841 @@ glszm_num_voxels(result::GLSZMResult) = result.Np
 glszm_num_voxels(result::GLSZMResult2D) = result.Np
 
 #==============================================================================#
+# GLSZM Marginal Distributions
+#==============================================================================#
+
+"""
+    _glszm_marginals(P::AbstractMatrix{Float64}, Nz::Int, Np::Int) -> NamedTuple
+
+Compute marginal distributions and other values needed for GLSZM features.
+
+# Arguments
+- `P`: GLSZM matrix (Ng × Ns), raw counts (not normalized)
+- `Nz`: Total number of zones
+- `Np`: Total number of voxels in zones
+
+# Returns
+NamedTuple with fields:
+- `pg`: Gray level marginal, pg(i) = Σⱼ P(i,j)
+- `ps`: Zone size marginal, ps(j) = Σᵢ P(i,j)
+- `Nz`: Total number of zones
+- `Np`: Total number of voxels
+- `Ng`: Number of gray levels
+- `Ns`: Maximum zone size
+"""
+function _glszm_marginals(P::AbstractMatrix{Float64}, Nz::Int, Np::Int)
+    Ng, Ns = size(P)
+
+    # Gray level marginal: pg(i) = Σⱼ P(i,j)
+    pg = vec(sum(P, dims=2))
+
+    # Zone size marginal: ps(j) = Σᵢ P(i,j)
+    ps = vec(sum(P, dims=1))
+
+    return (pg=pg, ps=ps, Nz=Nz, Np=Np, Ng=Ng, Ns=Ns)
+end
+
+#==============================================================================#
+# GLSZM Features - Zone Size Emphasis Features
+#==============================================================================#
+
+"""
+    glszm_small_area_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Small Area Emphasis (SAE): Measures the distribution of small zones.
+
+# Mathematical Formula
+```
+SAE = (1/Nz) × Σᵢ Σⱼ P(i,j) / j²
+```
+
+Higher values indicate finer textures with more small zones.
+
+# References
+- PyRadiomics: glszm.py:getSmallAreaEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Small zone emphasis
+"""
+function glszm_small_area_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        j_sq = j * j
+        for i in 1:Ng
+            total += P[i, j] / j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_large_area_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Large Area Emphasis (LAE): Measures the distribution of large zones.
+
+# Mathematical Formula
+```
+LAE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j²
+```
+
+Higher values indicate coarser textures with more large zones.
+
+# References
+- PyRadiomics: glszm.py:getLargeAreaEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Large zone emphasis
+"""
+function glszm_large_area_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        j_sq = j * j
+        for i in 1:Ng
+            total += P[i, j] * j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+#==============================================================================#
+# GLSZM Features - Non-Uniformity Features
+#==============================================================================#
+
+"""
+    glszm_gray_level_non_uniformity(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Gray Level Non-Uniformity (GLN): Measures variability of gray level intensity.
+
+# Mathematical Formula
+```
+GLN = (1/Nz) × Σᵢ (Σⱼ P(i,j))²
+```
+
+Lower values indicate more homogeneous gray level distribution.
+
+# References
+- PyRadiomics: glszm.py:getGrayLevelNonUniformityFeatureValue
+- IBSI: Grey level size zone based features - Grey level non-uniformity
+"""
+function glszm_gray_level_non_uniformity(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # pg(i) = Σⱼ P(i,j)
+    total = 0.0
+    @inbounds for i in 1:Ng
+        pg_i = 0.0
+        for j in 1:Ns
+            pg_i += P[i, j]
+        end
+        total += pg_i * pg_i
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_gray_level_non_uniformity_normalized(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Gray Level Non-Uniformity Normalized (GLNN): Normalized measure of gray level variability.
+
+# Mathematical Formula
+```
+GLNN = (1/Nz²) × Σᵢ (Σⱼ P(i,j))²
+```
+
+Similar to GLN but normalized by Nz², making it more comparable across different images.
+
+# References
+- PyRadiomics: glszm.py:getGrayLevelNonUniformityNormalizedFeatureValue
+- IBSI: Grey level size zone based features - Normalised grey level non-uniformity
+"""
+function glszm_gray_level_non_uniformity_normalized(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # pg(i) = Σⱼ P(i,j)
+    total = 0.0
+    @inbounds for i in 1:Ng
+        pg_i = 0.0
+        for j in 1:Ns
+            pg_i += P[i, j]
+        end
+        total += pg_i * pg_i
+    end
+
+    return total / (Nz * Nz)
+end
+
+"""
+    glszm_size_zone_non_uniformity(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Size Zone Non-Uniformity (SZN): Measures variability of zone sizes.
+
+# Mathematical Formula
+```
+SZN = (1/Nz) × Σⱼ (Σᵢ P(i,j))²
+```
+
+Lower values indicate more homogeneous zone size distribution.
+
+# References
+- PyRadiomics: glszm.py:getSizeZoneNonUniformityFeatureValue
+- IBSI: Grey level size zone based features - Zone size non-uniformity
+"""
+function glszm_size_zone_non_uniformity(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # ps(j) = Σᵢ P(i,j)
+    total = 0.0
+    @inbounds for j in 1:Ns
+        ps_j = 0.0
+        for i in 1:Ng
+            ps_j += P[i, j]
+        end
+        total += ps_j * ps_j
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_size_zone_non_uniformity_normalized(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Size Zone Non-Uniformity Normalized (SZNN): Normalized measure of zone size variability.
+
+# Mathematical Formula
+```
+SZNN = (1/Nz²) × Σⱼ (Σᵢ P(i,j))²
+```
+
+Similar to SZN but normalized by Nz².
+
+# References
+- PyRadiomics: glszm.py:getSizeZoneNonUniformityNormalizedFeatureValue
+- IBSI: Grey level size zone based features - Normalised zone size non-uniformity
+"""
+function glszm_size_zone_non_uniformity_normalized(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # ps(j) = Σᵢ P(i,j)
+    total = 0.0
+    @inbounds for j in 1:Ns
+        ps_j = 0.0
+        for i in 1:Ng
+            ps_j += P[i, j]
+        end
+        total += ps_j * ps_j
+    end
+
+    return total / (Nz * Nz)
+end
+
+#==============================================================================#
+# GLSZM Features - Zone Statistics Features
+#==============================================================================#
+
+"""
+    glszm_zone_percentage(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Zone Percentage (ZP): Ratio of zones to voxels.
+
+# Mathematical Formula
+```
+ZP = Nz / Np
+```
+
+where:
+- Nz is the total number of zones
+- Np is the total number of voxels in the ROI
+
+Higher values indicate finer textures (more zones for same number of voxels).
+
+# References
+- PyRadiomics: glszm.py:getZonePercentageFeatureValue
+- IBSI: Grey level size zone based features - Zone percentage
+"""
+function glszm_zone_percentage(result::Union{GLSZMResult, GLSZMResult2D})
+    Nz = result.Nz
+    Np = result.Np
+
+    if Np == 0
+        return NaN
+    end
+
+    return Float64(Nz) / Float64(Np)
+end
+
+"""
+    glszm_gray_level_variance(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Gray Level Variance (GLV): Measures variance in gray level intensities.
+
+# Mathematical Formula
+```
+GLV = Σᵢ Σⱼ p(i,j) × (i - μᵢ)²
+```
+
+where:
+- p(i,j) = P(i,j) / Nz (normalized GLSZM)
+- μᵢ = Σᵢ Σⱼ p(i,j) × i (mean gray level)
+
+# References
+- PyRadiomics: glszm.py:getGrayLevelVarianceFeatureValue
+- IBSI: Grey level size zone based features - Grey level variance
+"""
+function glszm_gray_level_variance(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # Compute mean gray level μᵢ = Σᵢ Σⱼ p(i,j) × i
+    mu_i = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            mu_i += (P[i, j] / Nz) * i
+        end
+    end
+
+    # Compute variance
+    variance = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            p_ij = P[i, j] / Nz
+            variance += p_ij * (i - mu_i)^2
+        end
+    end
+
+    return variance
+end
+
+"""
+    glszm_zone_variance(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Zone Variance (ZV): Measures variance in zone sizes.
+
+# Mathematical Formula
+```
+ZV = Σᵢ Σⱼ p(i,j) × (j - μⱼ)²
+```
+
+where:
+- p(i,j) = P(i,j) / Nz (normalized GLSZM)
+- μⱼ = Σᵢ Σⱼ p(i,j) × j (mean zone size)
+
+# References
+- PyRadiomics: glszm.py:getZoneVarianceFeatureValue
+- IBSI: Grey level size zone based features - Zone size variance
+"""
+function glszm_zone_variance(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    # Compute mean zone size μⱼ = Σᵢ Σⱼ p(i,j) × j
+    mu_j = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            mu_j += (P[i, j] / Nz) * j
+        end
+    end
+
+    # Compute variance
+    variance = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            p_ij = P[i, j] / Nz
+            variance += p_ij * (j - mu_j)^2
+        end
+    end
+
+    return variance
+end
+
+"""
+    glszm_zone_entropy(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Zone Entropy (ZE): Measures the randomness/heterogeneity of zone distribution.
+
+# Mathematical Formula
+```
+ZE = -Σᵢ Σⱼ p(i,j) × log₂(p(i,j) + ε)
+```
+
+where:
+- p(i,j) = P(i,j) / Nz (normalized GLSZM)
+- ε ≈ 2.2×10⁻¹⁶ (machine epsilon to prevent log(0))
+
+Higher values indicate more heterogeneous distributions.
+
+# References
+- PyRadiomics: glszm.py:getZoneEntropyFeatureValue
+- IBSI: Grey level size zone based features - Zone size entropy
+"""
+function glszm_zone_entropy(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    entropy = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            p_ij = P[i, j] / Nz
+            if p_ij > 0
+                entropy -= p_ij * log2(p_ij + GLSZM_EPSILON)
+            end
+        end
+    end
+
+    return entropy
+end
+
+#==============================================================================#
+# GLSZM Features - Gray Level Emphasis Features
+#==============================================================================#
+
+"""
+    glszm_low_gray_level_zone_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Low Gray Level Zone Emphasis (LGLZE): Measures the distribution of lower gray levels.
+
+# Mathematical Formula
+```
+LGLZE = (1/Nz) × Σᵢ Σⱼ P(i,j) / i²
+```
+
+Higher values indicate a greater proportion of lower gray level values.
+
+# References
+- PyRadiomics: glszm.py:getLowGrayLevelZoneEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Low grey level zone emphasis
+"""
+function glszm_low_gray_level_zone_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            total += P[i, j] / (i * i)
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_high_gray_level_zone_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+High Gray Level Zone Emphasis (HGLZE): Measures the distribution of higher gray levels.
+
+# Mathematical Formula
+```
+HGLZE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i²
+```
+
+Higher values indicate a greater proportion of higher gray level values.
+
+# References
+- PyRadiomics: glszm.py:getHighGrayLevelZoneEmphasisFeatureValue
+- IBSI: Grey level size zone based features - High grey level zone emphasis
+"""
+function glszm_high_gray_level_zone_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        for i in 1:Ng
+            total += P[i, j] * (i * i)
+        end
+    end
+
+    return total / Nz
+end
+
+#==============================================================================#
+# GLSZM Features - Joint Emphasis Features
+#==============================================================================#
+
+"""
+    glszm_small_area_low_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Small Area Low Gray Level Emphasis (SALGLE): Measures the proportion of small zones
+with low gray levels.
+
+# Mathematical Formula
+```
+SALGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) / (i² × j²)
+```
+
+Higher values indicate more small zones with low intensities.
+
+# References
+- PyRadiomics: glszm.py:getSmallAreaLowGrayLevelEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Small zone low grey level emphasis
+"""
+function glszm_small_area_low_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        j_sq = j * j
+        for i in 1:Ng
+            i_sq = i * i
+            total += P[i, j] / (i_sq * j_sq)
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_small_area_high_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Small Area High Gray Level Emphasis (SAHGLE): Measures the proportion of small zones
+with high gray levels.
+
+# Mathematical Formula
+```
+SAHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² / j²
+```
+
+Higher values indicate more small zones with high intensities.
+
+# References
+- PyRadiomics: glszm.py:getSmallAreaHighGrayLevelEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Small zone high grey level emphasis
+"""
+function glszm_small_area_high_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        j_sq = j * j
+        for i in 1:Ng
+            i_sq = i * i
+            total += P[i, j] * i_sq / j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_large_area_low_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Large Area Low Gray Level Emphasis (LALGLE): Measures the proportion of large zones
+with low gray levels.
+
+# Mathematical Formula
+```
+LALGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j² / i²
+```
+
+Higher values indicate more large zones with low intensities.
+
+# References
+- PyRadiomics: glszm.py:getLargeAreaLowGrayLevelEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Large zone low grey level emphasis
+"""
+function glszm_large_area_low_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        j_sq = j * j
+        for i in 1:Ng
+            i_sq = i * i
+            total += P[i, j] * j_sq / i_sq
+        end
+    end
+
+    return total / Nz
+end
+
+"""
+    glszm_large_area_high_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D}) -> Float64
+
+Large Area High Gray Level Emphasis (LAHGLE): Measures the proportion of large zones
+with high gray levels.
+
+# Mathematical Formula
+```
+LAHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² × j²
+```
+
+Higher values indicate more large zones with high intensities.
+
+# References
+- PyRadiomics: glszm.py:getLargeAreaHighGrayLevelEmphasisFeatureValue
+- IBSI: Grey level size zone based features - Large zone high grey level emphasis
+"""
+function glszm_large_area_high_gray_level_emphasis(result::Union{GLSZMResult, GLSZMResult2D})
+    P = result.matrix
+    Nz = result.Nz
+    Ng, Ns = size(P)
+
+    if Nz == 0
+        return NaN
+    end
+
+    total = 0.0
+    @inbounds for j in 1:Ns
+        j_sq = j * j
+        for i in 1:Ng
+            i_sq = i * i
+            total += P[i, j] * i_sq * j_sq
+        end
+    end
+
+    return total / Nz
+end
+
+#==============================================================================#
+# GLSZM Feature Extraction
+#==============================================================================#
+
+"""
+    glszm_feature_names() -> Vector{String}
+
+Get the list of all GLSZM feature names in standard order.
+"""
+function glszm_feature_names()
+    return [
+        "SmallAreaEmphasis",
+        "LargeAreaEmphasis",
+        "GrayLevelNonUniformity",
+        "GrayLevelNonUniformityNormalized",
+        "SizeZoneNonUniformity",
+        "SizeZoneNonUniformityNormalized",
+        "ZonePercentage",
+        "GrayLevelVariance",
+        "ZoneVariance",
+        "ZoneEntropy",
+        "LowGrayLevelZoneEmphasis",
+        "HighGrayLevelZoneEmphasis",
+        "SmallAreaLowGrayLevelEmphasis",
+        "SmallAreaHighGrayLevelEmphasis",
+        "LargeAreaLowGrayLevelEmphasis",
+        "LargeAreaHighGrayLevelEmphasis"
+    ]
+end
+
+"""
+    glszm_ibsi_features() -> Vector{String}
+
+Get the list of IBSI-compliant GLSZM feature names.
+All 16 GLSZM features are IBSI compliant.
+"""
+function glszm_ibsi_features()
+    return glszm_feature_names()
+end
+
+"""
+    extract_glszm(result::Union{GLSZMResult, GLSZMResult2D}) -> Dict{String, Float64}
+
+Extract all 16 GLSZM features from a computed GLSZM result.
+
+# Arguments
+- `result`: GLSZM computation result from compute_glszm()
+
+# Returns
+Dict mapping feature names to values. All 16 GLSZM features:
+- SmallAreaEmphasis
+- LargeAreaEmphasis
+- GrayLevelNonUniformity
+- GrayLevelNonUniformityNormalized
+- SizeZoneNonUniformity
+- SizeZoneNonUniformityNormalized
+- ZonePercentage
+- GrayLevelVariance
+- ZoneVariance
+- ZoneEntropy
+- LowGrayLevelZoneEmphasis
+- HighGrayLevelZoneEmphasis
+- SmallAreaLowGrayLevelEmphasis
+- SmallAreaHighGrayLevelEmphasis
+- LargeAreaLowGrayLevelEmphasis
+- LargeAreaHighGrayLevelEmphasis
+
+# Example
+```julia
+result = compute_glszm(image, mask, binwidth=25.0)
+features = extract_glszm(result)
+println(features["SmallAreaEmphasis"])
+```
+
+# References
+- PyRadiomics: glszm.py
+- IBSI: Grey level size zone based features
+"""
+function extract_glszm(result::Union{GLSZMResult, GLSZMResult2D})
+    return Dict{String, Float64}(
+        "SmallAreaEmphasis" => glszm_small_area_emphasis(result),
+        "LargeAreaEmphasis" => glszm_large_area_emphasis(result),
+        "GrayLevelNonUniformity" => glszm_gray_level_non_uniformity(result),
+        "GrayLevelNonUniformityNormalized" => glszm_gray_level_non_uniformity_normalized(result),
+        "SizeZoneNonUniformity" => glszm_size_zone_non_uniformity(result),
+        "SizeZoneNonUniformityNormalized" => glszm_size_zone_non_uniformity_normalized(result),
+        "ZonePercentage" => glszm_zone_percentage(result),
+        "GrayLevelVariance" => glszm_gray_level_variance(result),
+        "ZoneVariance" => glszm_zone_variance(result),
+        "ZoneEntropy" => glszm_zone_entropy(result),
+        "LowGrayLevelZoneEmphasis" => glszm_low_gray_level_zone_emphasis(result),
+        "HighGrayLevelZoneEmphasis" => glszm_high_gray_level_zone_emphasis(result),
+        "SmallAreaLowGrayLevelEmphasis" => glszm_small_area_low_gray_level_emphasis(result),
+        "SmallAreaHighGrayLevelEmphasis" => glszm_small_area_high_gray_level_emphasis(result),
+        "LargeAreaLowGrayLevelEmphasis" => glszm_large_area_low_gray_level_emphasis(result),
+        "LargeAreaHighGrayLevelEmphasis" => glszm_large_area_high_gray_level_emphasis(result)
+    )
+end
+
+"""
+    extract_glszm(image::AbstractArray{<:Real}, mask::AbstractArray{Bool};
+                  binwidth::Real=25.0, bincount::Union{Int, Nothing}=nothing,
+                  connectivity::Int=26) -> Dict{String, Float64}
+
+Extract all GLSZM features from an image and mask.
+
+This is a convenience function that computes the GLSZM and extracts all features.
+
+# Arguments
+- `image`: Image array (will be discretized)
+- `mask`: Boolean mask for ROI
+- `binwidth::Real=25.0`: Bin width for discretization
+- `bincount::Union{Int, Nothing}=nothing`: Bin count (overrides binwidth if specified)
+- `connectivity::Int=26`: Connectivity for zone detection (26 or 6 for 3D, 8 or 4 for 2D)
+
+# Returns
+Dict mapping feature names to values.
+
+# Example
+```julia
+features = extract_glszm(image, mask, binwidth=25.0)
+```
+"""
+function extract_glszm(image::AbstractArray{<:Real, 3}, mask::AbstractArray{Bool, 3};
+                       binwidth::Real=25.0, bincount::Union{Int, Nothing}=nothing,
+                       connectivity::Int=26)
+    result = compute_glszm(image, mask; binwidth=binwidth, bincount=bincount,
+                           connectivity=connectivity)
+    return extract_glszm(result)
+end
+
+function extract_glszm(image::AbstractArray{<:Real, 2}, mask::AbstractArray{Bool, 2};
+                       binwidth::Real=25.0, bincount::Union{Int, Nothing}=nothing,
+                       connectivity::Int=8)
+    result = compute_glszm(image, mask; binwidth=binwidth, bincount=bincount,
+                           connectivity=connectivity)
+    return extract_glszm(result)
+end
+
+"""
+    extract_glszm_to_featureset!(fs::FeatureSet, result::Union{GLSZMResult, GLSZMResult2D};
+                                  prefix::String="glszm_")
+
+Extract all GLSZM features and add them to an existing FeatureSet.
+
+# Arguments
+- `fs`: FeatureSet to add features to
+- `result`: GLSZM computation result
+- `prefix::String="glszm_"`: Prefix for feature names
+
+# Example
+```julia
+fs = FeatureSet()
+result = compute_glszm(image, mask)
+extract_glszm_to_featureset!(fs, result)
+```
+"""
+function extract_glszm_to_featureset!(fs::FeatureSet, result::Union{GLSZMResult, GLSZMResult2D};
+                                       prefix::String="glszm_")
+    features = extract_glszm(result)
+    for (name, value) in features
+        key = Symbol(prefix * name)
+        push!(fs.features, FeatureResult(key, value, "glszm"))
+    end
+    return fs
+end
+
+#==============================================================================#
 # Exports
 #==============================================================================#
 
@@ -615,3 +1450,17 @@ export GLSZMResult, GLSZMResult2D
 # Export utility functions
 export glszm_num_gray_levels, glszm_max_zone_size
 export glszm_num_zones, glszm_num_voxels
+
+# Export GLSZM feature functions
+export glszm_small_area_emphasis, glszm_large_area_emphasis
+export glszm_gray_level_non_uniformity, glszm_gray_level_non_uniformity_normalized
+export glszm_size_zone_non_uniformity, glszm_size_zone_non_uniformity_normalized
+export glszm_zone_percentage
+export glszm_gray_level_variance, glszm_zone_variance, glszm_zone_entropy
+export glszm_low_gray_level_zone_emphasis, glszm_high_gray_level_zone_emphasis
+export glszm_small_area_low_gray_level_emphasis, glszm_small_area_high_gray_level_emphasis
+export glszm_large_area_low_gray_level_emphasis, glszm_large_area_high_gray_level_emphasis
+
+# Export extraction functions
+export extract_glszm, extract_glszm_to_featureset!
+export glszm_feature_names, glszm_ibsi_features

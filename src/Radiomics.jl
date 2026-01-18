@@ -165,4 +165,18 @@ export compute_glszm, compute_glszm_2d
 export glszm_num_gray_levels, glszm_max_zone_size
 export glszm_num_zones, glszm_num_voxels
 
+# Export GLSZM feature functions
+export glszm_small_area_emphasis, glszm_large_area_emphasis
+export glszm_gray_level_non_uniformity, glszm_gray_level_non_uniformity_normalized
+export glszm_size_zone_non_uniformity, glszm_size_zone_non_uniformity_normalized
+export glszm_zone_percentage
+export glszm_gray_level_variance, glszm_zone_variance, glszm_zone_entropy
+export glszm_low_gray_level_zone_emphasis, glszm_high_gray_level_zone_emphasis
+export glszm_small_area_low_gray_level_emphasis, glszm_small_area_high_gray_level_emphasis
+export glszm_large_area_low_gray_level_emphasis, glszm_large_area_high_gray_level_emphasis
+
+# Export GLSZM extraction functions
+export extract_glszm, extract_glszm_to_featureset!
+export glszm_feature_names, glszm_ibsi_features
+
 end # module Radiomics

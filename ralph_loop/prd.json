@@ -806,7 +806,7 @@
       "title": "Implement NGTDM Matrix Computation",
       "description": "Implement Neighboring Gray Tone Difference Matrix",
       "priority": 35,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/ngtdm.jl module",
         "Implement neighborhood averaging",

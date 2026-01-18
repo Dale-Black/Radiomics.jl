@@ -7292,3 +7292,104 @@ def getStrengthFeatureValue(self):
 | List all NGTDM features with formulas | ✅ |
 | Create implementation checklist in progress.md | ✅ |
 
+
+### Iteration 36 - 2026-01-17 16:22:04
+
+**Agent started** (Open: 14, Done: 34)
+
+
+
+---
+
+## Iteration 37: IMPL-NGTDM-MATRIX
+
+**Date**: 2026-01-17
+**Story**: IMPL-NGTDM-MATRIX - Implement NGTDM Matrix Computation
+**Status**: ✅ COMPLETED
+
+### Summary
+
+Implemented the Neighbouring Gray Tone Difference Matrix (NGTDM) computation in Julia. Created `src/ngtdm.jl` module with full support for both 2D and 3D images.
+
+### Implementation Details
+
+#### NGTDMResult Type
+
+Created `NGTDMResult` and `NGTDMResult2D` structs to hold:
+- `s_i::Vector{Float64}` - Sum of |i - Ā_i| for all voxels at gray level i
+- `n_i::Vector{Int}` - Count of voxels at gray level i (with valid neighborhoods)
+- `p_i::Vector{Float64}` - Probability n_i / N_v_p
+- `gray_levels::Vector{Int}` - Non-empty gray level indices
+- `N_v_p::Int` - Total valid voxels (sum of n_i)
+- `N_g_p::Int` - Number of non-empty gray levels
+- `Ng::Int` - Total gray levels in discretized image
+
+#### compute_ngtdm Functions
+
+Implemented for both 3D and 2D images:
+- `compute_ngtdm(image::AbstractArray{<:Integer, 3}, mask; Ng=nothing, distance=1)`
+- `compute_ngtdm_2d(image::AbstractArray{<:Integer, 2}, mask; Ng=nothing, distance=1)`
+- Convenience wrappers that auto-discretize float images
+- Settings-based wrapper for configuration
+
+#### Key Features
+
+1. **Chebyshev Neighborhood**: Uses Chebyshev distance (L∞ norm) for neighborhood definition, giving a cube (3D) or square (2D) shaped neighborhood
+2. **Valid Voxel Handling**: Only includes voxels with at least 1 neighbor within the mask
+3. **Configurable Distance**: Default δ=1, supports larger neighborhood distances
+4. **Edge Handling**: Properly excludes boundary voxels with no valid neighbors
+
+#### Utility Functions Added
+
+- `ngtdm_num_gray_levels(result)` - Total gray levels
+- `ngtdm_num_valid_gray_levels(result)` - Non-empty gray levels (N_g_p)
+- `ngtdm_num_valid_voxels(result)` - Total valid voxels (N_v_p)
+- `ngtdm_sum_s(result)` - Sum of all s_i values
+
+### Files Changed
+
+1. **Created**: `src/ngtdm.jl` (490 lines)
+   - NGTDMResult and NGTDMResult2D types
+   - compute_ngtdm and compute_ngtdm_2d functions
+   - Helper functions for Chebyshev neighborhood offsets
+   - Utility functions for NGTDM access
+
+2. **Modified**: `src/Radiomics.jl`
+   - Added include for ngtdm.jl
+   - Added exports for NGTDM types and functions
+
+### Testing
+
+Verified the implementation with a simple test:
+```julia
+# Create test image and mask
+image = rand(1:8, 10, 10, 10)
+mask = trues(10, 10, 10)
+# Remove boundaries
+mask[1, :, :] .= false; mask[end, :, :] .= false
+# ... etc
+
+result = compute_ngtdm(image, mask, Ng=8, distance=1)
+# N_g_p (non-empty gray levels): 8
+# N_v_p (valid voxels): 512
+# Sum of s_i: 1054.28
+# p_i sums to: 1.0
+```
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create src/ngtdm.jl module | ✅ |
+| Implement neighborhood averaging | ✅ |
+| Implement NGTDM s_i and p_i computation | ✅ |
+| Handle edge voxels correctly | ✅ |
+| Support configurable neighborhood distance | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Git Commit
+
+```
+IMPL-NGTDM-MATRIX: Implement NGTDM matrix computation
+```
+

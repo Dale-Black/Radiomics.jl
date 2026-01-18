@@ -8409,3 +8409,104 @@ IMPL-GLDM-FEATURES: Implement all 14 GLDM texture features
 ```
 
 ---
+
+### Iteration 42 - 2026-01-17 17:05:43
+
+**Agent started** (Open: 8, Done: 40)
+
+
+### Iteration 42 - 2026-01-17
+
+**Story**: TEST-GLDM-PARITY
+**Status**: ✅ COMPLETED
+
+---
+
+## GLDM Parity Tests Implementation
+
+### Summary
+
+Created comprehensive parity tests for all 14 GLDM (Gray Level Dependence Matrix) features 
+in `test/test_gldm.jl`. Fixed a critical indexing bug in the GLDM feature implementations.
+
+### Bug Fix: j-Indexing Convention
+
+**Issue Discovered**: GLDM features using dependence size in formulas were failing parity tests.
+The ratio between Julia and PyRadiomics values was ~1:3 for emphasis features.
+
+**Root Cause**: 
+- PyRadiomics uses `jvector = np.arange(1, Nd + 1)` for column indices
+- Column 0 (dependence count 0) gets jvector value 1
+- Column 1 (dependence count 1) gets jvector value 2, etc.
+- Julia implementation was using 0-indexed dependence counts
+
+**Fix Applied**: Changed all GLDM features that use j² to use 1-indexed column positions
+instead of 0-indexed dependence counts, matching PyRadiomics convention.
+
+### Files Created
+
+- **test/test_gldm.jl** - 580 lines of comprehensive parity tests
+
+### Files Modified
+
+- **src/gldm.jl** - Fixed j-indexing in 7 feature functions
+
+### Features Affected by Fix
+
+| Feature | Change |
+|---------|--------|
+| SmallDependenceEmphasis | Use j instead of (j-1) for j² |
+| LargeDependenceEmphasis | Use j instead of (j-1) for j² |
+| DependenceVariance | Use j instead of (j-1) for μⱼ and variance |
+| SmallDependenceLowGrayLevelEmphasis | Use j instead of (j-1) for j² |
+| SmallDependenceHighGrayLevelEmphasis | Use j instead of (j-1) for j² |
+| LargeDependenceLowGrayLevelEmphasis | Use j instead of (j-1) for j² |
+| LargeDependenceHighGrayLevelEmphasis | Use j instead of (j-1) for j² |
+
+### Test Coverage
+
+| Test Category | Tests | Status |
+|--------------|-------|--------|
+| Individual feature tests (14 features × 3 seeds) | 42 | ✅ |
+| Environment setup | 1 | ✅ |
+| Comprehensive parity (all features × 3 seeds) | 42 | ✅ |
+| Different sizes (small, medium) | 28 | ✅ |
+| Discretization settings (4 binwidths × 14 features) | 56 | ✅ |
+| Edge cases (small mask, high intensity, integers) | 42 | ✅ |
+| Feature consistency | 56 | ✅ |
+| 2D image parity | 42 | ✅ |
+| Summary report | 2 | ✅ |
+| **Total** | **327** | ✅ |
+
+### Test Results
+
+```
+Test Summary:       | Pass  Total  Time
+GLDM Feature Parity |   85     85  2.7s
+Comprehensive GLDM  |   44     44  0.1s
+Discretization      |   56     56  0.0s
+Edge Cases          |   42     42  0.0s
+Feature Consistency |   56     56  0.0s
+2D Image Parity     |   42     42  0.0s
+GLDM Parity Summary |    2      2  0.1s
+
+# Full test suite: 1436 tests pass
+```
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| Create test/test_gldm.jl | ✅ |
+| Test GLDM matrix matches PyRadiomics | ✅ |
+| Test EVERY GLDM feature against PyRadiomics | ✅ (14/14) |
+| All tests pass within tolerance | ✅ |
+| Commit test file with descriptive message | ✅ |
+
+### Git Commit
+
+```
+TEST-GLDM-PARITY: Add GLDM parity tests and fix j-indexing
+```
+
+---

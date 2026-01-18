@@ -923,7 +923,7 @@
       "title": "Test GLDM Feature Parity",
       "description": "Verify all GLDM features match PyRadiomics",
       "priority": 41,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_gldm.jl",
         "Test GLDM matrix matches PyRadiomics",

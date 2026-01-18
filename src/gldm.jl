@@ -550,15 +550,16 @@ SDE = (1/Nz) × Σᵢ Σⱼ P(i,j) / j²
 ```
 
 where:
-- P(i,j) is the GLDM matrix (gray level i, dependence count j)
+- P(i,j) is the GLDM matrix (gray level i, dependence column j)
 - Nz is the total number of voxels (zones)
-- j is the dependence size (1-indexed for column j, representing dependence count j-1)
+- j is the 1-indexed column position (matching PyRadiomics convention)
 
 Higher values indicate smaller dependence and less homogeneous textures.
 
 # Notes
-- The jvector in the result contains the actual dependence values (0-indexed)
-- Column index j in the matrix corresponds to dependence value j-1
+- PyRadiomics uses jvector = [1, 2, 3, ..., Nd] for column indices
+- Column 1 corresponds to dependence count 0, column 2 to count 1, etc.
+- We use the same 1-indexed j values for parity
 
 # References
 - PyRadiomics: gldm.py:getSmallDependenceEmphasisFeatureValue
@@ -568,28 +569,17 @@ function gldm_small_dependence_emphasis(result::Union{GLDMResult, GLDMResult2D})
     P = result.P
     Nz = result.Nz
     Ng = size(P, 1)
-    max_dep = result.max_dependence
+    Nd = size(P, 2)
 
     if Nz == 0
         return NaN
     end
 
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
+    # In Julia, column index j is already 1-indexed, matching this convention
     total = 0.0
-    @inbounds for j in 1:(max_dep + 1)
-        # Column j corresponds to dependence count (j-1)
-        # For SDE, we use j² where j is the dependence count
-        # Dependence count 0 would give division by 0, so we skip it
-        dep_count = j - 1  # Actual dependence count (0-indexed)
-        if dep_count == 0
-            # For dependence count 0, j² = 0, skip (or use 1 to avoid div by zero)
-            # PyRadiomics uses actual j values starting from 0
-            # Looking at IBSI/PyRadiomics: j goes from 1 to Nd (number of dependences)
-            # Actually, PyRadiomics jvector contains the actual dependence sizes present
-            # and they start indexing from those values
-            # Let's handle 0 dependence specially
-            continue
-        end
-        j_sq = dep_count * dep_count
+    @inbounds for j in 1:Nd
+        j_sq = j * j  # Use 1-indexed column position directly
         for i in 1:Ng
             total += P[i, j] / j_sq
         end
@@ -608,6 +598,8 @@ Large Dependence Emphasis (LDE): Measures the distribution of large dependencies
 LDE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j²
 ```
 
+where j is the 1-indexed column position (matching PyRadiomics convention).
+
 Higher values indicate larger dependence and more homogeneous textures.
 
 # References
@@ -618,16 +610,16 @@ function gldm_large_dependence_emphasis(result::Union{GLDMResult, GLDMResult2D})
     P = result.P
     Nz = result.Nz
     Ng = size(P, 1)
-    max_dep = result.max_dependence
+    Nd = size(P, 2)
 
     if Nz == 0
         return NaN
     end
 
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
     total = 0.0
-    @inbounds for j in 1:(max_dep + 1)
-        dep_count = j - 1  # Actual dependence count
-        j_sq = dep_count * dep_count
+    @inbounds for j in 1:Nd
+        j_sq = j * j  # Use 1-indexed column position directly
         for i in 1:Ng
             total += P[i, j] * j_sq
         end
@@ -822,7 +814,7 @@ DV = Σᵢ Σⱼ p(i,j) × (j - μⱼ)²
 where:
 - p(i,j) = P(i,j) / Nz (normalized GLDM)
 - μⱼ = Σᵢ Σⱼ p(i,j) × j (mean dependence size)
-- j is the actual dependence count (0-indexed in the column)
+- j is the 1-indexed column position (matching PyRadiomics convention)
 
 # References
 - PyRadiomics: gldm.py:getDependenceVarianceFeatureValue
@@ -839,22 +831,20 @@ function gldm_dependence_variance(result::Union{GLDMResult, GLDMResult2D})
     end
 
     # Compute mean dependence size μⱼ = Σᵢ Σⱼ p(i,j) × j
-    # where j is the actual dependence count (column index - 1)
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
     mu_j = 0.0
     @inbounds for j in 1:Nd
-        dep_count = j - 1  # Actual dependence count
         for i in 1:Ng
-            mu_j += (P[i, j] / Nz) * dep_count
+            mu_j += (P[i, j] / Nz) * j  # Use 1-indexed column position
         end
     end
 
     # Compute variance
     variance = 0.0
     @inbounds for j in 1:Nd
-        dep_count = j - 1
         for i in 1:Ng
             p_ij = P[i, j] / Nz
-            variance += p_ij * (dep_count - mu_j)^2
+            variance += p_ij * (j - mu_j)^2  # Use 1-indexed column position
         end
     end
 
@@ -995,6 +985,8 @@ of small dependencies and low gray levels.
 SDLGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) / (i² × j²)
 ```
 
+where j is the 1-indexed column position (matching PyRadiomics convention).
+
 Higher values indicate a greater proportion of small dependencies with low gray levels.
 
 # References
@@ -1011,13 +1003,10 @@ function gldm_small_dependence_low_gray_level_emphasis(result::Union{GLDMResult,
         return NaN
     end
 
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
     total = 0.0
     @inbounds for j in 1:Nd
-        dep_count = j - 1  # Actual dependence count
-        if dep_count == 0
-            continue  # Skip 0 dependence to avoid division by zero
-        end
-        j_sq = dep_count * dep_count
+        j_sq = j * j  # Use 1-indexed column position directly
         for i in 1:Ng
             total += P[i, j] / (i * i * j_sq)
         end
@@ -1037,6 +1026,8 @@ of small dependencies and high gray levels.
 SDHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² / j²
 ```
 
+where j is the 1-indexed column position (matching PyRadiomics convention).
+
 Higher values indicate a greater proportion of small dependencies with high gray levels.
 
 # References
@@ -1053,13 +1044,10 @@ function gldm_small_dependence_high_gray_level_emphasis(result::Union{GLDMResult
         return NaN
     end
 
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
     total = 0.0
     @inbounds for j in 1:Nd
-        dep_count = j - 1
-        if dep_count == 0
-            continue  # Skip 0 dependence to avoid division by zero
-        end
-        j_sq = dep_count * dep_count
+        j_sq = j * j  # Use 1-indexed column position directly
         for i in 1:Ng
             total += P[i, j] * (i * i) / j_sq
         end
@@ -1079,6 +1067,8 @@ of large dependencies and low gray levels.
 LDLGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × j² / i²
 ```
 
+where j is the 1-indexed column position (matching PyRadiomics convention).
+
 Higher values indicate a greater proportion of large dependencies with low gray levels.
 
 # References
@@ -1095,10 +1085,10 @@ function gldm_large_dependence_low_gray_level_emphasis(result::Union{GLDMResult,
         return NaN
     end
 
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
     total = 0.0
     @inbounds for j in 1:Nd
-        dep_count = j - 1
-        j_sq = dep_count * dep_count
+        j_sq = j * j  # Use 1-indexed column position directly
         for i in 1:Ng
             total += P[i, j] * j_sq / (i * i)
         end
@@ -1118,6 +1108,8 @@ of large dependencies and high gray levels.
 LDHGLE = (1/Nz) × Σᵢ Σⱼ P(i,j) × i² × j²
 ```
 
+where j is the 1-indexed column position (matching PyRadiomics convention).
+
 Higher values indicate a greater proportion of large dependencies with high gray levels.
 
 # References
@@ -1134,10 +1126,10 @@ function gldm_large_dependence_high_gray_level_emphasis(result::Union{GLDMResult
         return NaN
     end
 
+    # PyRadiomics uses jvector = np.arange(1, Nd + 1), so j values are 1, 2, 3, ...
     total = 0.0
     @inbounds for j in 1:Nd
-        dep_count = j - 1
-        j_sq = dep_count * dep_count
+        j_sq = j * j  # Use 1-indexed column position directly
         for i in 1:Ng
             total += P[i, j] * (i * i) * j_sq
         end

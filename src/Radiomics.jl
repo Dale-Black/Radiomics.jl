@@ -72,6 +72,9 @@ include("gldm.jl")
 # Feature extractor - unified extraction interface
 include("extractor.jl")
 
+# High-level API and convenience functions
+include("api.jl")
+
 # Export abstract types
 export AbstractRadiomicsFeature,
        AbstractFirstOrderFeature,
@@ -217,5 +220,11 @@ export extract, enable!, disable!, enable_all!, disable_all!
 export is_enabled, enabled_classes
 export extract_all, extract_firstorder_only, extract_shape_only, extract_texture_only
 export feature_count, total_feature_count, feature_names, all_feature_names
+
+# Export high-level API functions
+export extract_glcm, extract_glrlm, extract_glszm, extract_ngtdm, extract_gldm
+export summarize_features, features_to_dataframe
+export extract_batch
+export list_feature_classes, describe_feature
 
 end # module Radiomics

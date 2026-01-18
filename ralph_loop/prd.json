@@ -1165,7 +1165,7 @@
       "title": "Write API Documentation",
       "description": "Document all public API",
       "priority": 46,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Ensure all public functions have docstrings",
         "Create docs/ folder structure",

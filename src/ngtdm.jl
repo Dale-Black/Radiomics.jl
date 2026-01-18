@@ -488,3 +488,313 @@ Get the sum of all s_i values (Σ s_i).
 """
 ngtdm_sum_s(result::NGTDMResult) = sum(result.s_i)
 ngtdm_sum_s(result::NGTDMResult2D) = sum(result.s_i)
+
+#==============================================================================#
+# NGTDM Features (5 Total)
+#==============================================================================#
+
+"""
+    ngtdm_coarseness(result::Union{NGTDMResult, NGTDMResult2D}) -> Float64
+
+Compute the Coarseness feature from the NGTDM.
+
+# Mathematical Formula
+``\\text{Coarseness} = \\frac{1}{\\sum_i p_i \\times s_i}``
+
+# Description
+Measures the spatial rate of change in intensity. Higher values indicate locally
+uniform textures with low spatial change rates. A coarse texture has larger
+homogeneous regions.
+
+# Edge Case
+If Σ(p_i × s_i) ≈ 0 (completely homogeneous image), returns 10^6 to avoid
+division by zero.
+
+# Returns
+- `Float64`: Coarseness value
+
+# References
+- PyRadiomics: radiomics/ngtdm.py:getCoarsenessFeatureValue()
+- IBSI: Section 3.6.6.1
+- Amadasun & King (1989), DOI: 10.1109/21.44046
+"""
+function ngtdm_coarseness(result::Union{NGTDMResult, NGTDMResult2D})
+    # Sum of p_i * s_i over non-empty gray levels
+    sum_coarse = 0.0
+    @inbounds for i in result.gray_levels
+        sum_coarse += result.p_i[i] * result.s_i[i]
+    end
+
+    # Handle homogeneous image case
+    if sum_coarse < NGTDM_EPSILON
+        return NGTDM_COARSENESS_MAX
+    end
+
+    return 1.0 / sum_coarse
+end
+
+"""
+    ngtdm_contrast(result::Union{NGTDMResult, NGTDMResult2D}) -> Float64
+
+Compute the Contrast feature from the NGTDM.
+
+# Mathematical Formula
+``\\text{Contrast} = \\left[\\frac{1}{N_{g,p}(N_{g,p}-1)} \\sum_i \\sum_j p_i p_j (i-j)^2\\right] \\times \\left[\\frac{1}{N_{v,p}} \\sum_i s_i\\right]``
+
+# Description
+Measures both the dynamic range of gray levels and the spatial intensity change.
+Higher values indicate large changes between voxels and their neighborhoods,
+as well as large gray level differences.
+
+# Edge Case
+If N_g,p = 1 (only one gray level), returns 0.
+
+# Returns
+- `Float64`: Contrast value
+
+# References
+- PyRadiomics: radiomics/ngtdm.py:getContrastFeatureValue()
+- IBSI: Section 3.6.6.2
+- Amadasun & King (1989), DOI: 10.1109/21.44046
+"""
+function ngtdm_contrast(result::Union{NGTDMResult, NGTDMResult2D})
+    N_g_p = result.N_g_p
+    N_v_p = result.N_v_p
+
+    # Edge case: only one gray level
+    if N_g_p <= 1
+        return 0.0
+    end
+
+    # Term 1: Gray level variance (weighted by probabilities)
+    # Σᵢ Σⱼ p_i × p_j × (i - j)²
+    term1 = 0.0
+    @inbounds for i in result.gray_levels
+        for j in result.gray_levels
+            term1 += result.p_i[i] * result.p_i[j] * (i - j)^2
+        end
+    end
+    term1 /= (N_g_p * (N_g_p - 1))
+
+    # Term 2: Sum of differences normalized by voxel count
+    term2 = sum(result.s_i) / N_v_p
+
+    return term1 * term2
+end
+
+"""
+    ngtdm_busyness(result::Union{NGTDMResult, NGTDMResult2D}) -> Float64
+
+Compute the Busyness feature from the NGTDM.
+
+# Mathematical Formula
+``\\text{Busyness} = \\frac{\\sum_i p_i s_i}{\\sum_i \\sum_j |i \\cdot p_i - j \\cdot p_j|}``
+
+# Description
+Measures the change from a pixel to its neighbor. A high busyness value
+indicates a "busy" image with rapid changes of intensity between pixels
+and their neighborhoods.
+
+# Edge Case
+If N_g,p = 1, returns 0 (denominator would be zero).
+
+# Returns
+- `Float64`: Busyness value
+
+# References
+- PyRadiomics: radiomics/ngtdm.py:getBusynessFeatureValue()
+- IBSI: Section 3.6.6.3
+- Amadasun & King (1989), DOI: 10.1109/21.44046
+"""
+function ngtdm_busyness(result::Union{NGTDMResult, NGTDMResult2D})
+    N_g_p = result.N_g_p
+
+    # Edge case: only one gray level
+    if N_g_p <= 1
+        return 0.0
+    end
+
+    # Numerator: Σ p_i × s_i
+    numerator = 0.0
+    @inbounds for i in result.gray_levels
+        numerator += result.p_i[i] * result.s_i[i]
+    end
+
+    # Denominator: Σᵢ Σⱼ |i × p_i - j × p_j|
+    denominator = 0.0
+    @inbounds for i in result.gray_levels
+        for j in result.gray_levels
+            denominator += abs(i * result.p_i[i] - j * result.p_i[j])
+        end
+    end
+
+    # Avoid division by zero
+    if denominator < NGTDM_EPSILON
+        return 0.0
+    end
+
+    return numerator / denominator
+end
+
+"""
+    ngtdm_complexity(result::Union{NGTDMResult, NGTDMResult2D}) -> Float64
+
+Compute the Complexity feature from the NGTDM.
+
+# Mathematical Formula
+``\\text{Complexity} = \\frac{1}{N_{v,p}} \\sum_i \\sum_j \\frac{|i-j| \\times (p_i s_i + p_j s_j)}{p_i + p_j}``
+
+# Description
+An image is considered complex when there are many primitive components
+(i.e., the image is non-uniform with many rapid changes in gray level intensity).
+The feature measures both the number of primitives and the average difference
+from the mean value.
+
+# Edge Case
+When p_i + p_j = 0, that term is skipped.
+
+# Returns
+- `Float64`: Complexity value
+
+# References
+- PyRadiomics: radiomics/ngtdm.py:getComplexityFeatureValue()
+- IBSI: Section 3.6.6.4
+- Amadasun & King (1989), DOI: 10.1109/21.44046
+"""
+function ngtdm_complexity(result::Union{NGTDMResult, NGTDMResult2D})
+    N_v_p = result.N_v_p
+
+    if N_v_p == 0
+        return 0.0
+    end
+
+    total = 0.0
+    @inbounds for i in result.gray_levels
+        p_i = result.p_i[i]
+        ps_i = p_i * result.s_i[i]
+
+        for j in result.gray_levels
+            p_j = result.p_i[j]
+            p_sum = p_i + p_j
+
+            # Skip if denominator is zero
+            if p_sum > NGTDM_EPSILON
+                ps_j = p_j * result.s_i[j]
+                diff_ij = abs(i - j)
+                total += diff_ij * (ps_i + ps_j) / p_sum
+            end
+        end
+    end
+
+    return total / N_v_p
+end
+
+"""
+    ngtdm_strength(result::Union{NGTDMResult, NGTDMResult2D}) -> Float64
+
+Compute the Strength feature from the NGTDM.
+
+# Mathematical Formula
+``\\text{Strength} = \\frac{\\sum_i \\sum_j (p_i + p_j)(i-j)^2}{\\sum_i s_i}``
+
+# Description
+Measures the primitives in an image. A high strength value indicates primitives
+that are easily defined and visible (an image with slow change in intensity
+but large coarse differences in gray level intensities).
+
+# Edge Case
+If Σ s_i = 0, returns 0.
+
+# Returns
+- `Float64`: Strength value
+
+# References
+- PyRadiomics: radiomics/ngtdm.py:getStrengthFeatureValue()
+- IBSI: Section 3.6.6.5
+- Amadasun & King (1989), DOI: 10.1109/21.44046
+"""
+function ngtdm_strength(result::Union{NGTDMResult, NGTDMResult2D})
+    sum_s = sum(result.s_i)
+
+    # Edge case: no differences
+    if sum_s < NGTDM_EPSILON
+        return 0.0
+    end
+
+    # Numerator: Σᵢ Σⱼ (p_i + p_j) × (i - j)²
+    numerator = 0.0
+    @inbounds for i in result.gray_levels
+        for j in result.gray_levels
+            p_sum = result.p_i[i] + result.p_i[j]
+            diff_sq = (i - j)^2
+            numerator += p_sum * diff_sq
+        end
+    end
+
+    return numerator / sum_s
+end
+
+#==============================================================================#
+# Convenience Functions for All NGTDM Features
+#==============================================================================#
+
+"""
+    compute_all_ngtdm_features(result::Union{NGTDMResult, NGTDMResult2D}) -> NamedTuple
+
+Compute all 5 NGTDM features at once.
+
+# Returns
+A NamedTuple with fields:
+- `coarseness::Float64`
+- `contrast::Float64`
+- `busyness::Float64`
+- `complexity::Float64`
+- `strength::Float64`
+
+# Example
+```julia
+result = compute_ngtdm(image, mask, binwidth=25.0)
+features = compute_all_ngtdm_features(result)
+println("Coarseness: ", features.coarseness)
+```
+"""
+function compute_all_ngtdm_features(result::Union{NGTDMResult, NGTDMResult2D})
+    return (
+        coarseness = ngtdm_coarseness(result),
+        contrast = ngtdm_contrast(result),
+        busyness = ngtdm_busyness(result),
+        complexity = ngtdm_complexity(result),
+        strength = ngtdm_strength(result)
+    )
+end
+
+"""
+    compute_all_ngtdm_features(image::AbstractArray{<:Real}, mask::AbstractArray{Bool};
+                               binwidth::Real=25.0, bincount::Union{Int, Nothing}=nothing,
+                               distance::Int=1) -> NamedTuple
+
+Compute all 5 NGTDM features directly from image and mask.
+
+# Arguments
+- `image`: Image array
+- `mask`: Boolean mask for ROI
+- `binwidth::Real=25.0`: Bin width for discretization
+- `bincount::Union{Int, Nothing}=nothing`: Bin count (overrides binwidth if specified)
+- `distance::Int=1`: Chebyshev distance for neighborhood
+
+# Returns
+A NamedTuple with all 5 NGTDM features.
+
+# Example
+```julia
+features = compute_all_ngtdm_features(image, mask, binwidth=25.0)
+```
+"""
+function compute_all_ngtdm_features(image::AbstractArray{<:Real},
+                                    mask::AbstractArray{Bool};
+                                    binwidth::Real=25.0,
+                                    bincount::Union{Int, Nothing}=nothing,
+                                    distance::Int=1)
+    result = compute_ngtdm(image, mask; binwidth=binwidth, bincount=bincount, distance=distance)
+    return compute_all_ngtdm_features(result)
+end

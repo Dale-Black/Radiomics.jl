@@ -187,4 +187,9 @@ export compute_ngtdm, compute_ngtdm_2d
 export ngtdm_num_gray_levels, ngtdm_num_valid_gray_levels
 export ngtdm_num_valid_voxels, ngtdm_sum_s
 
+# Export NGTDM feature functions
+export ngtdm_coarseness, ngtdm_contrast, ngtdm_busyness
+export ngtdm_complexity, ngtdm_strength
+export compute_all_ngtdm_features
+
 end # module Radiomics

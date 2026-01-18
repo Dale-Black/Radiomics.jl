@@ -7494,3 +7494,99 @@ features = compute_all_ngtdm_features(result)
 IMPL-NGTDM-FEATURES: Implement all 5 NGTDM texture features
 ```
 
+
+### Iteration 38 - 2026-01-17 16:28:25
+
+**Agent started** (Open: 12, Done: 36)
+
+
+---
+
+## Iteration 39: TEST-NGTDM-PARITY
+
+**Date**: 2026-01-17
+**Story**: TEST-NGTDM-PARITY - Test NGTDM Feature Parity
+**Status**: ✅ COMPLETED
+
+### Summary
+
+Created comprehensive parity tests for all 5 NGTDM features against PyRadiomics. During testing, discovered and fixed a bug in how boundary voxels are handled - Julia implementation now matches PyRadiomics behavior exactly.
+
+### Key Discovery and Fix
+
+**Issue Found**: Initial tests showed ~0.02% relative difference in feature values.
+
+**Root Cause**: Different handling of voxels with no valid neighbors:
+- **Original Julia implementation**: Excluded voxels with no neighbors from n_i count
+- **PyRadiomics behavior**: Includes ALL masked voxels in n_i, but voxels with no neighbors have diff=0
+
+**Fix Applied**: Updated both 3D (`compute_ngtdm`) and 2D (`compute_ngtdm_2d`) functions to:
+1. Include all masked voxels in n_i counts
+2. Only add to s_i for voxels with valid neighbors (diff=0 for isolated voxels)
+
+This ensures N_v_p equals total masked voxels, matching PyRadiomics exactly.
+
+### Files Created/Modified
+
+1. **Created**: `test/test_ngtdm.jl`
+   - Tests all 5 NGTDM features against PyRadiomics
+   - Multiple test seeds (42, 123, 456)
+   - Multiple array sizes (16³, 32³)
+   - Edge cases: small mask, high intensity, integer values
+   - 2D image parity tests
+   - Feature consistency and bounds tests
+   - Summary report with detailed results
+
+2. **Modified**: `test/runtests.jl`
+   - Enabled test_ngtdm.jl inclusion
+
+3. **Modified**: `src/ngtdm.jl`
+   - Fixed boundary voxel handling in compute_ngtdm (3D)
+   - Fixed boundary voxel handling in compute_ngtdm_2d (2D)
+   - Updated docstrings to document behavior
+
+### Test Results
+
+```
+NGTDM Feature Parity       | Pass  Total
+---------------------------+-------------
+Test Environment Setup     |    1      1
+Coarseness                 |    3      3
+Contrast                   |    3      3
+Busyness                   |    3      3
+Complexity                 |    3      3
+Strength                   |    3      3
+Comprehensive NGTDM Parity |   17     17
+Discretization Settings    |   20     20
+Edge Cases                 |   15     15
+Feature Consistency        |   20     20
+2D Image Parity            |   15     15
+NGTDM Parity Summary       |    2      2
+---------------------------+-------------
+TOTAL                      |  120    120
+```
+
+Full test suite: **1436 tests pass**
+
+### Tolerances Used
+
+- Relative tolerance (rtol): 1e-10
+- Absolute tolerance (atol): 1e-12
+
+All tests pass within these strict tolerances after the fix.
+
+### Acceptance Criteria Verification
+
+| Criterion | Status |
+|-----------|--------|
+| Create test/test_ngtdm.jl | ✅ |
+| Test NGTDM matrix matches PyRadiomics | ✅ |
+| Test EVERY NGTDM feature against PyRadiomics | ✅ |
+| All tests pass within tolerance | ✅ |
+| Commit test file with descriptive message | ✅ |
+
+### Git Commit
+
+```
+TEST-NGTDM-PARITY: Add NGTDM parity tests and fix boundary voxel handling
+```

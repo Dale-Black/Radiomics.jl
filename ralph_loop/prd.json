@@ -843,7 +843,7 @@
       "title": "Test NGTDM Feature Parity",
       "description": "Verify all NGTDM features match PyRadiomics",
       "priority": 37,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create test/test_ngtdm.jl",
         "Test NGTDM matrix matches PyRadiomics",

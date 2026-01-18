@@ -50,8 +50,9 @@ The NGTDM is stored as vectors indexed by gray level. Empty gray levels
 (where n_i = 0) are tracked in gray_levels for iteration but the full
 s_i and n_i vectors cover all Ng gray levels.
 
-A voxel is "valid" if it has at least one neighbor within the mask.
-Boundary voxels with no valid neighbors are excluded from computation.
+All masked voxels are included in n_i counts. Voxels with no valid neighbors
+contribute to n_i but have diff=0 (so they don't contribute to s_i).
+This matches PyRadiomics behavior.
 """
 struct NGTDMResult
     s_i::Vector{Float64}      # Sum of |i - Ā_i| for all voxels at gray level i
@@ -173,8 +174,9 @@ where Ā_i is the average gray level of valid neighbors.
 
 # Notes
 - Input image should be discretized (integer gray levels starting from 1)
-- A voxel is only included if it has at least 1 neighbor within the mask
-- Edge voxels with no valid neighbors are excluded
+- All masked voxels are included in n_i counts
+- Voxels with no neighbors in mask contribute to n_i but have diff=0 for s_i
+- This matches PyRadiomics behavior
 
 # Example
 ```julia
@@ -250,14 +252,16 @@ function compute_ngtdm(image::AbstractArray{<:Integer, 3},
             end
         end
 
-        # Only include voxels with at least one valid neighbor
+        # Include all voxels in count (matching PyRadiomics behavior)
+        # For voxels with no valid neighbors, diff=0 (s_i unchanged)
+        n_i[gray_level] += 1
         if valid_neighbor_count > 0
             avg_neighbor = neighbor_sum / valid_neighbor_count
             diff = abs(Float64(gray_level) - avg_neighbor)
-
             s_i[gray_level] += diff
-            n_i[gray_level] += 1
         end
+        # Note: Voxels with no neighbors contribute to n_i but not s_i
+        # This matches PyRadiomics behavior where isolated voxels have diff=0
     end
 
     # Compute derived values
@@ -353,14 +357,16 @@ function compute_ngtdm_2d(image::AbstractArray{<:Integer, 2},
             end
         end
 
-        # Only include voxels with at least one valid neighbor
+        # Include all voxels in count (matching PyRadiomics behavior)
+        # For voxels with no valid neighbors, diff=0 (s_i unchanged)
+        n_i[gray_level] += 1
         if valid_neighbor_count > 0
             avg_neighbor = neighbor_sum / valid_neighbor_count
             diff = abs(Float64(gray_level) - avg_neighbor)
-
             s_i[gray_level] += diff
-            n_i[gray_level] += 1
         end
+        # Note: Voxels with no neighbors contribute to n_i but not s_i
+        # This matches PyRadiomics behavior where isolated voxels have diff=0
     end
 
     # Compute derived values

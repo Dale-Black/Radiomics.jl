@@ -8200,3 +8200,112 @@ A critical property: **Nz (total zones) = Np (total voxels)**
 RESEARCH-GLDM-DETAILS: Document GLDM matrix and all 14 features with formulas
 ```
 
+
+### Iteration 40 - 2026-01-17
+
+**Story**: IMPL-GLDM-MATRIX
+**Status**: ✅ COMPLETED
+
+---
+
+## GLDM Matrix Implementation
+
+### Summary
+
+Implemented the Gray Level Dependence Matrix (GLDM) computation in `src/gldm.jl`. The GLDM quantifies gray level dependencies by counting voxels with a given gray level that have a specific number of "dependent" neighbors (neighbors within alpha tolerance).
+
+### Files Created/Modified
+
+- **Created**: `src/gldm.jl` - New GLDM module with 540+ lines of code
+- **Modified**: `src/Radiomics.jl` - Added include and exports
+
+### Types Implemented
+
+| Type | Description |
+|------|-------------|
+| `GLDMResult` | Container for 3D GLDM results |
+| `GLDMResult2D` | Container for 2D GLDM results |
+
+### Functions Implemented
+
+| Function | Description |
+|----------|-------------|
+| `compute_gldm(image, mask; Ng, alpha, distance)` | Compute GLDM for 3D discretized image |
+| `compute_gldm_2d(image, mask; Ng, alpha, distance)` | Compute GLDM for 2D discretized image |
+| `compute_gldm(image, mask; binwidth, bincount, alpha, distance)` | Convenience wrapper with discretization |
+| `compute_gldm(image, mask, settings)` | Compute GLDM using Settings object |
+| `_get_gldm_offsets_3d(distance)` | Get all 3D neighbor offsets |
+| `_get_gldm_offsets_2d(distance)` | Get all 2D neighbor offsets |
+
+### Utility Functions
+
+| Function | Description |
+|----------|-------------|
+| `gldm_num_gray_levels(result)` | Get total number of gray levels |
+| `gldm_num_valid_gray_levels(result)` | Get count of non-empty gray levels |
+| `gldm_num_zones(result)` | Get total zones (= total voxels) |
+| `gldm_max_dependence(result)` | Get maximum possible dependence |
+| `gldm_gray_levels(result)` | Get gray levels present in ROI |
+| `gldm_dependence_sizes(result)` | Get dependence sizes present in ROI |
+
+### Key Implementation Details
+
+1. **Neighbor Definition**
+   - Uses Chebyshev distance (L∞ norm) for neighborhood
+   - For distance=1: 26 neighbors in 3D (3×3×3 - 1), 8 in 2D (3×3 - 1)
+   - All neighbors are checked (forward AND backward)
+
+2. **Dependence Definition**
+   - A neighbor is "dependent" if |gray_level_center - gray_level_neighbor| ≤ α
+   - Default α=0 means only exact gray level matches count
+   - Higher α values allow greater intensity tolerance
+
+3. **Boundary Voxel Handling**
+   - Unlike NGTDM, GLDM **includes all voxels** in the mask
+   - Boundary voxels simply have fewer potential neighbors
+   - This means boundary voxels may have lower dependence counts
+
+4. **Key Property: Nz = Np**
+   - Every voxel has exactly one entry in the GLDM
+   - Total zones Nz always equals total voxels Np
+   - This is different from GLSZM where Nz can be < Np
+
+5. **Matrix Structure**
+   - Rows: Gray levels (1 to Ng)
+   - Columns: Dependence counts (0 to max_dependence)
+   - Column index j+1 corresponds to dependence count j
+
+### Test Results
+
+```julia
+# Simple verification test
+image = rand(1:5, 10, 10, 10)
+mask = trues(10, 10, 10)
+result = compute_gldm(image, mask; alpha=0)
+
+# GLDM matrix size: (5, 27)  - 5 gray levels, 0-26 dependence counts
+# Number of zones: 1000      - equals sum(mask)
+# Maximum dependence: 26     - 26 neighbors for distance=1
+
+# All 1436 existing tests pass
+```
+
+### Acceptance Criteria Status
+
+| Criterion | Status |
+|-----------|--------|
+| Create src/gldm.jl module | ✅ |
+| Implement dependence counting algorithm | ✅ |
+| Implement GLDM matrix computation | ✅ |
+| Support configurable alpha (coarseness) parameter | ✅ |
+| Support configurable neighborhood distance | ✅ |
+| Commit with descriptive message | ✅ |
+
+### Git Commit
+
+```
+IMPL-GLDM-MATRIX: Implement GLDM matrix computation
+```
+
+---
+

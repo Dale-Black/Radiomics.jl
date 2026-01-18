@@ -877,7 +877,7 @@
       "title": "Implement GLDM Matrix Computation",
       "description": "Implement Gray Level Dependence Matrix",
       "priority": 39,
-      "status": "open",
+      "status": "done",
       "acceptanceCriteria": [
         "Create src/gldm.jl module",
         "Implement dependence counting algorithm",

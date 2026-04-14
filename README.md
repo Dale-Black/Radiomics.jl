@@ -1,7 +1,7 @@
 # Radiomics.jl
 
-[![CI](https://github.com/daleblack/Radiomics.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/daleblack/Radiomics.jl/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/daleblack/Radiomics.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/daleblack/Radiomics.jl)
+[![CI](https://github.com/Dale-Black/Radiomics.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Dale-Black/Radiomics.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/Dale-Black/Radiomics.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Dale-Black/Radiomics.jl)
 
 A **pure Julia** implementation of [PyRadiomics](https://github.com/AIM-Harvard/pyradiomics) for extracting radiomic features from medical images.
 
@@ -39,7 +39,7 @@ For development version:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/daleblack/Radiomics.jl")
+Pkg.add(url="https://github.com/Dale-Black/Radiomics.jl")
 ```
 
 ## Quick Start

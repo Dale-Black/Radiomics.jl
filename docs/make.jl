@@ -6,7 +6,7 @@ makedocs(
     authors = "Dale Black and contributors",
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
-        canonical = "https://daleblack.github.io/Radiomics.jl",
+        canonical = "https://Dale-Black.github.io/Radiomics.jl",
         assets = String[],
     ),
     modules = [Radiomics],
@@ -22,7 +22,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/daleblack/Radiomics.jl.git",
+    repo = "github.com/Dale-Black/Radiomics.jl.git",
     devbranch = "main",
     push_preview = true,
 )

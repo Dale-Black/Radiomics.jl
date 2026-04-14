@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "created": "2026-01-17",
   "updated": "2026-01-17",
-  "repository": "https://github.com/daleblack/Radiomics.jl",
+  "repository": "https://github.com/Dale-Black/Radiomics.jl",
   "reference": "https://github.com/AIM-Harvard/pyradiomics",
   "overview": {
     "goal": "Port PyRadiomics to pure Julia with guaranteed parity via exhaustive 1:1 unit testing",
